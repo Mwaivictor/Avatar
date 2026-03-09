@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  # ─── AI Inference Servers (CPU-only inference) ────────────────────
+
+  face-animation:
+    build: ./inference_servers/face_animation
+    container_name: avatar-face-animation
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    volumes:
+      - ./checkpoints:/app/checkpoints:ro
+    environment:
+      - FOMM_CHECKPOINT=/app/checkpoints/vox-cpk.pth.tar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  voice-conversion:
+    build: ./inference_servers/voice_conversion
+    container_name: avatar-voice-conversion
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+    volumes:
+      - hubert-cache:/root/.cache/huggingface
+    environment:
+      - VC_USE_HUBERT=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  lip-sync:
+    build: ./inference_servers/lip_sync
+    container_name: avatar-lip-sync
+    ports:
+      - "8003:8003"
+    restart: unless-stopped
+    volumes:
+      - ./checkpoints:/app/checkpoints:ro
+    environment:
+      - WAV2LIP_CHECKPOINT=/app/checkpoints/wav2lip_gan.pth
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  hubert-cache:

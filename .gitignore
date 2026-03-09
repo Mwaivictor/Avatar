@@ -1,0 +1,40 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Model checkpoints (large binary files — download separately)
+checkpoints/
+*.pth
+*.pth.tar
+
+# Uploaded avatars (keep default only)
+static/avatars/*
+!static/avatars/.gitkeep
+!static/avatars/default.png
