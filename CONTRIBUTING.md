@@ -7,7 +7,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/avatar.git
+   git clone https://github.com/Mwaivictor/Avatar.git
    cd avatar
    ```
 3. **Create a branch** for your work:
