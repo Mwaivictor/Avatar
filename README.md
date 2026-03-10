@@ -1,321 +1,295 @@
-# Avatar Transformation System
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Docker-28%2B-2496ED?logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
+</p>
 
-> **Disclaimer**: This project is for **educational purposes only** and should not be reused in any production environment, commercial application, identity fraud, impersonation, deepfake generation, or any context that violates applicable laws or the rights of others. The authors assume no liability for misuse.
+# 🎭 Avatar — Real-Time Avatar & Voice Transformation
 
-Real-time avatar and voice transformation platform. Captures your webcam and microphone, runs the feed through AI models (face animation, voice conversion, lip sync), and outputs the result through virtual camera/microphone devices that any video call app can use.
+Transform your appearance and voice in real time for video calls. Avatar replaces your webcam feed with an AI-generated avatar that mirrors your facial expressions and converts your voice — all routed through virtual devices that work with **any** video call app (Google Meet, Zoom, Teams, Discord, etc.).
 
-Everything runs locally on your machine — the AI models run in Docker containers on CPU (no GPU needed).
+> **⚠️ Educational & Research Project** — This system is built for learning about real-time AI pipelines, computer vision, and audio processing. Use responsibly and ethically.
 
-## Architecture
+---
 
-```
- You (webcam + mic)
-        │
-    ┌───┴───┐
-    │ start.py │ ← run this, it does everything
-    └───┬───┘
-        │
-  ┌─────┴─────┐
-  │  Dashboard │  http://127.0.0.1:8000
-  │  (FastAPI) │  permission gate + controls
-  └─────┬─────┘
-        │
-  ┌─────┴──────────────────────────────────┐
-  │        Docker Containers (CPU)          │
-  │  ┌──────────────┐ ┌─────────────────┐  │
-  │  │ Face Anim.   │ │ Voice Conversion│  │
-  │  │ FOMM :8001   │ │ HuBERT+WORLD   │  │
-  │  │              │ │ :8002           │  │
-  │  └──────────────┘ └─────────────────┘  │
-  │         ┌──────────────┐               │
-  │         │ Lip Sync     │               │
-  │         │ Wav2Lip :8003│               │
-  │         └──────────────┘               │
-  └────────────────────────────────────────┘
-        │
-  Virtual Camera + Virtual Mic
-        │
-  Zoom / Meet / Teams / Discord / WhatsApp / ...
-```
+## ✨ Features
 
-## AI Models
+- **Real-time face animation** — Your expressions drive an avatar face using First Order Motion Model (FOMM)
+- **Voice conversion** — Transform your voice in real time using HuBERT + WORLD vocoder
+- **Lip sync** — Keep avatar mouth movements matched to your speech with Wav2Lip
+- **Virtual camera & microphone** — Output appears as standard system devices (OBS Virtual Camera + VB-Audio)
+- **Works with any app** — Google Meet, Zoom, Teams, Discord, WhatsApp — anything that uses a camera/mic
+- **Web dashboard** — Simple browser UI to control everything, preview feeds, and upload avatars
+- **Custom voice profiles** — Upload a `.wav` sample to clone a voice
 
-| Service | Model | What It Does | Weights |
-|---------|-------|-------------|---------|
-| Face Animation | [First Order Motion Model](https://github.com/AliaksandrSiarohin/first-order-model) | Transfers your head motion to the avatar image | `vox-cpk.pth.tar` (~700 MB) |
-| Voice Conversion | HuBERT + WORLD Vocoder | Changes your voice pitch/timbre to a target profile | Auto-downloaded from HuggingFace |
-| Lip Sync | [Wav2Lip](https://github.com/Rudrabha/Wav2Lip) | Moves the avatar's lips to match converted audio | `wav2lip_gan.pth` (~400 MB) |
+---
 
-## Prerequisites
-
-You need these installed before running:
-
-| Requirement | What | Install Link |
-|---|---|---|
-| **Python 3.10+** | Runs the dashboard + pipeline | https://www.python.org/downloads/ |
-| **Docker Desktop** | Runs the AI models in containers | https://docs.docker.com/get-docker/ |
-| **Virtual Camera** | OBS Virtual Camera (comes with OBS) | https://obsproject.com/ |
-| **Virtual Mic** *(optional)* | VB-Audio Virtual Cable (Windows) | https://vb-audio.com/Cable/ |
-| **Webcam + Microphone** | Your physical devices | — |
-
-Docker Compose is included with Docker Desktop. That's it — `start.py` handles the rest.
-
-## Quick Start
-
-### 1. Download model checkpoints
-
-Create a `checkpoints/` folder and download the weights:
+## 🏗️ Architecture
 
 ```
-Avatar/
-  checkpoints/
-    vox-cpk.pth.tar     ← from FOMM repo (https://github.com/AliaksandrSiarohin/first-order-model)
-    wav2lip_gan.pth      ← from Wav2Lip repo (https://github.com/Rudrabha/Wav2Lip)
+┌──────────────┐     ┌──────────────────────────────────────────┐     ┌───────────────┐
+│   Webcam +   │────▶│              Avatar System               │────▶│ OBS Virtual   │
+│   Microphone │     │                                          │     │ Camera        │
+└──────────────┘     │  ┌────────┐  ┌────────┐  ┌──────────┐  │     ├───────────────┤
+                     │  │  Face  │  │ Voice  │  │   Lip    │  │     │ VB-Audio      │
+                     │  │Tracker │  │Convert │  │   Sync   │  │────▶│ Virtual Cable │
+                     │  └───┬────┘  └───┬────┘  └────┬─────┘  │     └───────┬───────┘
+                     │      │           │            │         │             │
+                     │      ▼           ▼            ▼         │             ▼
+                     │  ┌────────────────────────────────────┐ │     ┌───────────────┐
+                     │  │     AI Inference (Docker)          │ │     │  Google Meet   │
+                     │  │  :8001 FOMM  :8002 VC  :8003 W2L  │ │     │  Zoom / Teams  │
+                     │  └────────────────────────────────────┘ │     │  Discord / etc │
+                     └──────────────────────────────────────────┘     └───────────────┘
 ```
 
-> HuBERT weights don't need manual download — they auto-download from HuggingFace on first start.
+---
 
-### 2. Run start.py
+## 📋 Prerequisites
+
+| Requirement | Details |
+|---|---|
+| **Python** | 3.11 or higher |
+| **Docker Desktop** | For running AI inference servers |
+| **OBS Studio** | Provides OBS Virtual Camera driver |
+| **VB-Audio Virtual Cable** | Provides virtual microphone driver |
+| **GPU (optional)** | NVIDIA GPU with CUDA speeds up inference significantly |
+
+### Install Virtual Device Drivers
+
+**Windows** (run as Administrator):
+```powershell
+cd C:\Users\Admin\Desktop\Avatar
+powershell -ExecutionPolicy Bypass -File install_virtual_devices.ps1
+```
+
+Or install manually:
+- **OBS Studio**: https://obsproject.com/download
+- **VB-Audio Virtual Cable**: https://vb-audio.com/Cable/
+
+> Restart your computer after installing the drivers.
+
+---
+
+## 🚀 Quick Start
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/YOUR_USERNAME/avatar.git
+cd avatar
+
+# 2. Install Python dependencies
+pip install -r requirements.txt
+
+# 3. Start everything (Docker containers + web server)
 python start.py
+
+# 4. Open the dashboard
+#    http://127.0.0.1:8000
 ```
 
-That's it. `start.py` will:
+`start.py` will:
+1. Build and start the 3 Docker inference containers
+2. Wait for health checks to pass
+3. Launch the FastAPI web server on port 8000
 
-1. ✓ Check that Python, Docker, and Docker Compose are installed
-2. ✓ Create `checkpoints/` and `static/avatars/` directories
-3. ✓ Copy `.env.example` → `.env` (if `.env` doesn't exist)
-4. ✓ Install Python dependencies (`pip install -r requirements.txt`)
-5. ✓ Build and start 3 Docker containers (face, voice, lip sync)
-6. ✓ Wait for all services to become healthy
-7. ✓ Launch the dashboard at **http://127.0.0.1:8000**
+### Using with Video Calls
 
-### 3. Use the dashboard
+1. Click **Start Avatar** in the dashboard
+2. In your video call app (Meet, Zoom, Teams), go to **Settings**:
+   - **Camera** → select **OBS Virtual Camera**
+   - **Microphone** → select **CABLE Output (VB-Audio Virtual Cable)**
+3. Others will see your avatar and hear your converted voice
 
-Open **http://127.0.0.1:8000** in your browser.
+---
 
-1. **Grant permissions** — the dashboard auto-detects running video call apps. Select the ones you want and click Grant Access.
-2. **Upload an avatar** — any face image (PNG/JPG). This is the face that will appear on camera.
-3. **Pick a voice** — select a preset (Male Deep, Female Bright, etc.) or upload a `.wav` sample to create a custom voice profile.
-4. **Start Pipeline** — your webcam + mic feed is now transformed in real-time.
-5. **In your video call app** — select "OBS Virtual Camera" as your camera and the virtual audio cable as your microphone.
+## 🖥️ Dashboard
 
-### start.py commands
+The web dashboard at `http://127.0.0.1:8000` provides:
 
-| Command | What it does |
-|---------|-------------|
-| `python start.py` | Full startup (install + build + run) |
-| `python start.py --build` | Force rebuild Docker images |
-| `python start.py --stop` | Stop Docker containers |
-| `python start.py --status` | Check if services are healthy |
-| `python start.py --skip-docker` | Start dashboard only (containers already running) |
-| `python start.py --skip-pip` | Skip Python dependency install |
+- **Live preview** — See your webcam input and avatar output side by side
+- **One-click start/stop** — No complex setup, just click Start
+- **Avatar upload** — Upload any face image as your avatar
+- **Voice selection** — Choose from built-in voice profiles or upload custom `.wav` samples
+- **Service health** — Monitor the 3 AI inference containers
+- **Performance stats** — FPS, A/V drift, frame/audio counters
 
-## Voice System
+---
 
-Two ways to choose a voice:
-
-### Preset profiles (built-in)
-
-Select from the dropdown in the dashboard:
-
-| Profile | Pitch | Character |
-|---------|-------|-----------|
-| Default | No change | Your natural voice |
-| Male Deep | ~95 Hz | Low, resonant |
-| Male Medium | ~120 Hz | Natural male range |
-| Female Bright | ~220 Hz | Higher, clear |
-| Female Warm | ~195 Hz | Mid-high, rounded |
-
-### Upload your own voice
-
-1. Record a `.wav` file (1–10 seconds of clear speech)
-2. Enter a profile name in the dashboard (e.g. "narrator")
-3. Click **Upload Voice Sample**
-4. The system analyzes the pitch, spectral tilt, and formant structure
-5. A new voice profile is created and auto-selected
-
-This is voice **conversion** (pitch/timbre shifting), not voice **cloning**. Your words and rhythm stay the same — the tonal characteristics change.
-
-## App Detection
-
-The system scans for running video call apps in three ways:
-
-| Method | How | Example |
-|--------|-----|---------|
-| **Process scan** | Checks running `.exe` processes via `psutil` | Zoom.exe, Teams.exe, Discord.exe |
-| **Browser title (known)** | Reads window titles and matches known URL patterns | meet.google.com, web.whatsapp.com, discord.com |
-| **Browser title (generic)** | Catches any browser tab with video-call keywords | "My Company Meeting Room", "Conference Call" |
-
-Works across **all browsers** (Chrome, Firefox, Edge, Brave, Opera, Arc, etc.) — it reads the window title, not the browser binary.
-
-The dashboard and the video call don't need to be in the same browser.
-
-## Permission System
-
-The pipeline will **not start** until you explicitly grant permission:
-
-- Permissions are per-app (Zoom, Meet, Teams, etc.)
-- Camera and microphone can be enabled/disabled independently
-- Revoke at any time — pipeline stops immediately
-- All permissions reset on restart (nothing persisted to disk)
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-Avatar/
-├── start.py                         # ← Run this. Handles everything.
-├── main.py                          # FastAPI launcher (called by start.py)
-├── config.py                        # Settings from .env
-├── docker-compose.yml               # Docker container definitions
-├── requirements.txt                 # Python dependencies
-├── .env.example                     # Default environment variables
-│
-├── checkpoints/                     # Model weights (you download these)
-│   ├── vox-cpk.pth.tar
-│   └── wav2lip_gan.pth
+avatar/
+├── start.py                    # Launcher — builds Docker, starts server
+├── main.py                     # Uvicorn entry point
+├── config.py                   # Configuration (env vars / dataclasses)
+├── requirements.txt            # Python dependencies
+├── docker-compose.yml          # AI inference containers
+├── install_virtual_devices.ps1 # Windows driver installer
 │
 ├── app/
-│   ├── controller.py                # Pipeline orchestrator
-│   ├── permissions.py               # Consent gate (per-app, per-device)
-│   ├── app_detector.py              # Process + window title scanner
+│   ├── controller.py           # Pipeline orchestrator
+│   ├── api/
+│   │   └── server.py           # FastAPI REST API + web UI
 │   ├── capture/
-│   │   ├── video_capture.py         # Threaded webcam capture
-│   │   └── audio_capture.py         # Threaded mic capture
+│   │   ├── video_capture.py    # Webcam capture (OpenCV)
+│   │   └── audio_capture.py    # Microphone capture (sounddevice)
 │   ├── tracking/
-│   │   ├── face_tracker.py          # MediaPipe Face Mesh (468 landmarks)
-│   │   └── expression_analyzer.py   # Blink, mouth, smile, head pose
+│   │   ├── face_tracker.py     # MediaPipe face landmark detection
+│   │   └── expression_analyzer.py
 │   ├── services/
-│   │   ├── base_client.py           # Async HTTP client base
+│   │   ├── base_client.py      # Async HTTP client base
 │   │   ├── face_animation_client.py
 │   │   ├── voice_conversion_client.py
 │   │   └── lip_sync_client.py
 │   ├── rendering/
-│   │   ├── renderer.py              # Frame compositing
-│   │   └── synchronizer.py          # A/V sync buffer
-│   ├── output/
-│   │   ├── virtual_camera.py        # pyvirtualcam output
-│   │   └── virtual_microphone.py    # Virtual audio cable output
-│   └── api/
-│       └── server.py                # REST API + serves dashboard
+│   │   ├── renderer.py         # Frame compositing
+│   │   └── synchronizer.py     # A/V sync
+│   └── output/
+│       ├── virtual_camera.py   # OBS Virtual Camera output
+│       └── virtual_microphone.py # VB-Audio output
 │
 ├── inference_servers/
-│   ├── face_animation/              # FOMM Docker service (port 8001)
-│   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   ├── server.py
-│   │   ├── inference.py
-│   │   └── models/fomm.py
-│   ├── voice_conversion/            # HuBERT+WORLD Docker service (port 8002)
-│   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   ├── server.py
-│   │   └── models/pipeline.py
-│   └── lip_sync/                    # Wav2Lip Docker service (port 8003)
-│       ├── Dockerfile
-│       ├── requirements.txt
-│       ├── server.py
-│       ├── inference.py
-│       └── models/
-│           ├── wav2lip.py
-│           └── audio.py
+│   ├── face_animation/         # FOMM — First Order Motion Model (:8001)
+│   ├── voice_conversion/       # HuBERT + WORLD vocoder (:8002)
+│   └── lip_sync/               # Wav2Lip (:8003)
 │
 ├── static/
-│   └── dashboard.html               # Web UI (dark theme, single page)
-│
+│   └── dashboard.html          # Web UI
+├── checkpoints/                # Model weights (not in repo — see below)
 └── tests/
-    ├── test_capture.py
-    ├── test_rendering.py
-    └── test_services.py
 ```
 
-## Configuration
+---
 
-All settings come from environment variables. `start.py` copies `.env.example` to `.env` on first run.
+## ⚙️ Configuration
 
-| Variable | Default | What |
-|----------|---------|------|
-| `AVATAR_CAMERA_INDEX` | `0` | Webcam device index |
-| `AVATAR_FRAME_WIDTH` | `640` | Capture width (px) |
-| `AVATAR_FRAME_HEIGHT` | `480` | Capture height (px) |
-| `AVATAR_TARGET_FPS` | `30` | Target frame rate |
-| `AVATAR_SAMPLE_RATE` | `16000` | Audio sample rate (Hz) |
-| `AVATAR_FACE_ANIMATION_URL` | `http://localhost:8001` | Face animation endpoint |
-| `AVATAR_VOICE_CONVERSION_URL` | `http://localhost:8002` | Voice conversion endpoint |
-| `AVATAR_LIP_SYNC_URL` | `http://localhost:8003` | Lip sync endpoint |
-| `AVATAR_SERVICE_TIMEOUT` | `0.5` | Inference call timeout (sec) |
-| `AVATAR_DEBUG` | `false` | Debug logging + auto-reload |
-
-## REST API
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/api/status` | Pipeline status + metrics |
-| `GET` | `/api/services/health` | AI service health |
-| `POST` | `/api/pipeline/start` | Start pipeline (needs permission) |
-| `POST` | `/api/pipeline/stop` | Stop pipeline |
-| `POST` | `/api/avatar/upload` | Upload avatar image |
-| `POST` | `/api/voice/speaker?speaker_id=` | Select voice profile |
-| `GET` | `/api/voice/speakers` | List all voice profiles |
-| `POST` | `/api/voice/upload?speaker_id=` | Upload .wav to create voice profile |
-| `GET` | `/api/stream/video` | MJPEG video stream |
-| `GET` | `/api/stream/preview` | Single preview frame |
-| `GET` | `/api/apps/detect` | Scan for running video apps |
-| `GET` | `/api/permissions` | List all permission records |
-| `GET` | `/api/permissions/status` | Quick permission summary |
-| `POST` | `/api/permissions/grant` | Grant access for an app |
-| `POST` | `/api/permissions/revoke?app_id=` | Revoke access for an app |
-| `POST` | `/api/permissions/revoke-all` | Revoke all + stop pipeline |
-
-## Performance
-
-All AI inference runs on **CPU** inside Docker. No GPU or CUDA required.
-
-| Stage | How |
-|-------|-----|
-| Video capture | Threaded OpenCV, ring buffer, zero-copy latest frame |
-| Audio capture | Threaded PyAudio, chunk batching |
-| Face tracking | MediaPipe Face Mesh (468 landmarks per frame) |
-| AI inference | Async HTTP to localhost Docker containers |
-| A/V sync | Timestamp-based synchronizer with drift correction |
-| Output | pyvirtualcam (30 FPS) + PyAudio stream |
-
-Expect **10–20 FPS** on a modern CPU. The pipeline gracefully holds the previous frame if inference takes too long.
-
-Docker images use CPU-only PyTorch (~800 MB instead of ~2.3 GB for CUDA builds).
-
-## Stopping
+All settings are configurable via environment variables. Copy `.env.example` to `.env`:
 
 ```bash
-# Stop everything (Ctrl+C stops the dashboard, then):
-python start.py --stop
-
-# Or just stop Docker containers:
-docker compose down
+cp .env.example .env
 ```
 
-## Troubleshooting
+| Variable | Default | Description |
+|---|---|---|
+| `AVATAR_CAMERA_INDEX` | `0` | Webcam device index |
+| `AVATAR_FRAME_WIDTH` | `640` | Capture width |
+| `AVATAR_FRAME_HEIGHT` | `480` | Capture height |
+| `AVATAR_TARGET_FPS` | `30` | Target frame rate |
+| `AVATAR_SAMPLE_RATE` | `16000` | Audio sample rate |
+| `AVATAR_SERVICE_TIMEOUT` | `10` | AI service request timeout (seconds) |
+| `AVATAR_OUTPUT_WIDTH` | `640` | Output resolution width |
+| `AVATAR_OUTPUT_HEIGHT` | `480` | Output resolution height |
+| `AVATAR_OUTPUT_FPS` | `30` | Output frame rate |
+| `AVATAR_VIRTUAL_CAMERA` | *(auto)* | Override virtual camera device name |
+| `AVATAR_VIRTUAL_MIC` | *(auto)* | Override virtual mic device name |
 
-| Problem | Fix |
-|---------|-----|
-| `Docker daemon is not running` | Open Docker Desktop and wait for it to start |
-| Services stuck at "waiting for health" | Check logs: `docker compose logs -f` |
-| No virtual camera in Zoom/Meet | Install OBS Studio, open it once to register the virtual camera |
-| Audio not transforming | Install VB-Audio Virtual Cable, select it as mic in your call app |
-| Checkpoints missing warning | Download model weights into `checkpoints/` (see Quick Start) |
-| `pip install` fails on PyAudio | Windows: `pip install pipwin && pipwin install pyaudio` |
-| Port 8000 already in use | Set `AVATAR_PORT=9000` in `.env` |
+---
 
-## Technology Stack
+## 🔌 REST API
 
-| Layer | Technology |
-|-------|------------|
-| Launcher | Python (`start.py`) |
-| Backend | FastAPI, uvicorn |
-| Computer Vision | OpenCV, MediaPipe |
-| AI Inference | Docker, CPU-only PyTorch, REST APIs |
-| Audio | PyAudio, pyworld, HuBERT (HuggingFace) |
-| Virtual Devices | pyvirtualcam, virtual audio cable |
-| Frontend | Single-page HTML/JS dashboard |
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Web dashboard |
+| `GET` | `/health` | Server health check |
+| `GET` | `/api/status` | Pipeline status + stats |
+| `GET` | `/api/services/health` | AI service health |
+| `POST` | `/api/pipeline/start` | Start the pipeline |
+| `POST` | `/api/pipeline/stop` | Stop the pipeline |
+| `POST` | `/api/avatar/upload` | Upload avatar image |
+| `GET` | `/api/voice/speakers` | List voice profiles |
+| `POST` | `/api/voice/speaker` | Set active voice |
+| `POST` | `/api/voice/upload` | Upload voice sample |
+| `GET` | `/api/stream/video` | MJPEG avatar output stream |
+| `GET` | `/api/stream/webcam` | MJPEG webcam input stream |
+| `GET` | `/api/devices` | Virtual device info |
+
+---
+
+## 🧠 AI Models
+
+| Service | Model | Port | Purpose |
+|---|---|---|---|
+| Face Animation | First Order Motion Model (FOMM) | 8001 | Animate avatar with your expressions |
+| Voice Conversion | HuBERT + WORLD vocoder | 8002 | Real-time voice transformation |
+| Lip Sync | Wav2Lip | 8003 | Match avatar lips to speech |
+
+### Model Checkpoints
+
+Model weights are **not included** in the repository (they're large binary files). The Docker containers will download them automatically on first build.
+
+If running without Docker, place checkpoints in `checkpoints/`:
+- `vox-cpk.pth.tar` — FOMM weights
+- `wav2lip_gan.pth` — Wav2Lip weights
+
+---
+
+## 🛠️ Development
+
+### Running without Docker
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Start just the web server (no AI inference)
+python main.py
+```
+
+### Running tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+### Code structure
+
+- **Capture** → raw webcam frames + audio chunks
+- **Tracking** → MediaPipe face landmarks + expression analysis
+- **Services** → async HTTP clients to Docker inference servers
+- **Rendering** → frame compositing + A/V synchronization
+- **Output** → virtual camera (pyvirtualcam) + virtual mic (sounddevice)
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+## ⚠️ Ethical Use
+
+This software is intended for **educational and research purposes**. Users are responsible for ensuring their use complies with:
+
+- Local laws regarding identity and impersonation
+- Platform terms of service (Zoom, Meet, Teams, etc.)
+- Consent of people being communicated with
+- Organizational policies on video call modifications
+
+**Do not** use this system to deceive, defraud, or impersonate others without their knowledge and consent.
+
+---
+
+## 🙏 Acknowledgments
+
+- [First Order Motion Model](https://github.com/AliaksandrSiarohin/first-order-model) — Aliaksandr Siarohin et al.
+- [Wav2Lip](https://github.com/Rudrabha/Wav2Lip) — Rudrabha Mukhopadhyay et al.
+- [MediaPipe](https://github.com/google/mediapipe) — Google
+- [pyvirtualcam](https://github.com/letmaik/pyvirtualcam) — Maik Riechert
+- [OBS Studio](https://obsproject.com/) — OBS Project
+- [VB-Audio](https://vb-audio.com/) — VB-Audio Software

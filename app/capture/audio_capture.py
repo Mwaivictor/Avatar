@@ -1,5 +1,5 @@
 """
-Audio capture module using PyAudio.
+Audio capture module using sounddevice.
 Records microphone input in a dedicated thread, buffering chunks for processing.
 """
 
@@ -9,6 +9,7 @@ import queue
 from typing import Optional
 
 import numpy as np
+import sounddevice as sd
 
 from config import AudioConfig
 
@@ -21,7 +22,6 @@ class AudioCapture:
     def __init__(self, config: AudioConfig):
         self.config = config
         self._stream = None
-        self._audio_interface = None
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._buffer: queue.Queue[np.ndarray] = queue.Queue(maxsize=100)
@@ -29,20 +29,30 @@ class AudioCapture:
 
     def start(self) -> None:
         """Open the microphone stream and begin recording."""
-        import pyaudio
-
-        self._audio_interface = pyaudio.PyAudio()
-        self._stream = self._audio_interface.open(
-            format=pyaudio.paInt16,
-            channels=self.config.channels,
-            rate=self.config.sample_rate,
-            input=True,
-            frames_per_buffer=self.config.chunk_size,
-        )
-
         self._running = True
-        self._thread = threading.Thread(target=self._capture_loop, daemon=True)
-        self._thread.start()
+
+        def _audio_callback(indata, frames, time_info, status):
+            if status:
+                logger.warning("Audio capture status: %s", status)
+            audio_array = indata[:, 0].copy() if indata.shape[1] > 1 else indata.flatten().copy()
+            try:
+                self._buffer.put_nowait(audio_array)
+            except queue.Full:
+                try:
+                    self._buffer.get_nowait()
+                except queue.Empty:
+                    pass
+                self._buffer.put_nowait(audio_array)
+            self._total_chunks += 1
+
+        self._stream = sd.InputStream(
+            samplerate=self.config.sample_rate,
+            channels=self.config.channels,
+            blocksize=self.config.chunk_size,
+            dtype="float32",
+            callback=_audio_callback,
+        )
+        self._stream.start()
         logger.info(
             "Audio capture started: %d Hz, %d channels, chunk=%d",
             self.config.sample_rate,
@@ -51,30 +61,8 @@ class AudioCapture:
         )
 
     def _capture_loop(self) -> None:
-        """Continuously read audio chunks from the microphone."""
-        while self._running:
-            try:
-                raw_data = self._stream.read(
-                    self.config.chunk_size, exception_on_overflow=False
-                )
-                audio_array = np.frombuffer(raw_data, dtype=np.int16).astype(
-                    np.float32
-                ) / 32768.0
-
-                try:
-                    self._buffer.put_nowait(audio_array)
-                except queue.Full:
-                    # Drop oldest chunk to prevent unbounded memory growth
-                    try:
-                        self._buffer.get_nowait()
-                    except queue.Empty:
-                        pass
-                    self._buffer.put_nowait(audio_array)
-
-                self._total_chunks += 1
-
-            except Exception:
-                logger.exception("Error reading audio")
+        """Unused — sounddevice uses a callback instead."""
+        pass
 
     def read(self) -> Optional[np.ndarray]:
         """Return the next audio chunk, or None if the buffer is empty."""
@@ -110,11 +98,7 @@ class AudioCapture:
     def stop(self) -> None:
         """Stop recording and release resources."""
         self._running = False
-        if self._thread is not None:
-            self._thread.join(timeout=2.0)
         if self._stream is not None:
-            self._stream.stop_stream()
+            self._stream.stop()
             self._stream.close()
-        if self._audio_interface is not None:
-            self._audio_interface.terminate()
         logger.info("Audio capture stopped after %d chunks", self._total_chunks)

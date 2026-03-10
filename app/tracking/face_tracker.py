@@ -1,10 +1,12 @@
 """
-Face tracking module using MediaPipe Face Mesh.
-Extracts 468 facial landmarks from video frames in real time.
+Face tracking module using MediaPipe Face Landmarker (tasks API).
+Extracts 478 facial landmarks from video frames in real time.
 """
 
 import logging
-from typing import Optional, List, Tuple
+import os
+import urllib.request
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -26,9 +28,27 @@ LEFT_EAR = [234]
 RIGHT_EAR = [454]
 FOREHEAD = [10]
 
+_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/"
+    "face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+)
+_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
+_MODEL_PATH = os.path.join(_MODEL_DIR, "face_landmarker.task")
+
+
+def _ensure_model() -> str:
+    """Download the face landmarker model if it doesn't exist."""
+    if os.path.exists(_MODEL_PATH):
+        return _MODEL_PATH
+    os.makedirs(_MODEL_DIR, exist_ok=True)
+    logger.info("Downloading face_landmarker.task ...")
+    urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
+    logger.info("Downloaded face_landmarker.task to %s", _MODEL_PATH)
+    return _MODEL_PATH
+
 
 class FaceTracker:
-    """Real-time face landmark detection using MediaPipe Face Mesh."""
+    """Real-time face landmark detection using MediaPipe FaceLandmarker."""
 
     def __init__(
         self,
@@ -38,14 +58,18 @@ class FaceTracker:
     ):
         import mediapipe as mp
 
-        self._mp_face_mesh = mp.solutions.face_mesh
-        self._face_mesh = self._mp_face_mesh.FaceMesh(
-            static_image_mode=False,
-            max_num_faces=max_faces,
-            refine_landmarks=True,
-            min_detection_confidence=min_detection_confidence,
+        model_path = _ensure_model()
+        base_options = mp.tasks.BaseOptions(model_asset_path=model_path)
+        options = mp.tasks.vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            running_mode=mp.tasks.vision.RunningMode.VIDEO,
+            num_faces=max_faces,
+            min_face_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,
         )
+        self._landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(options)
+        self._mp = mp
+        self._frame_ts_ms = 0
         self._last_landmarks: Optional[np.ndarray] = None
         logger.info("FaceTracker initialized (max_faces=%d)", max_faces)
 
@@ -56,19 +80,22 @@ class FaceTracker:
         Detect face landmarks in a BGR frame.
 
         Returns:
-            Array of shape (468, 3) with normalized (x, y, z) coordinates,
+            Array of shape (478, 3) with normalized (x, y, z) coordinates,
             or None if no face is detected.
         """
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb_frame.flags.writeable = False
-        results = self._face_mesh.process(rgb_frame)
+        mp_image = self._mp.Image(
+            image_format=self._mp.ImageFormat.SRGB, data=rgb_frame
+        )
+        self._frame_ts_ms += 33  # ~30 FPS
+        result = self._landmarker.detect_for_video(mp_image, self._frame_ts_ms)
 
-        if not results.multi_face_landmarks:
+        if not result.face_landmarks:
             return None
 
-        face = results.multi_face_landmarks[0]
+        face = result.face_landmarks[0]
         landmarks = np.array(
-            [(lm.x, lm.y, lm.z) for lm in face.landmark], dtype=np.float32
+            [(lm.x, lm.y, lm.z) for lm in face], dtype=np.float32
         )
         self._last_landmarks = landmarks
         return landmarks
@@ -87,5 +114,5 @@ class FaceTracker:
         return self._last_landmarks
 
     def close(self) -> None:
-        self._face_mesh.close()
+        self._landmarker.close()
         logger.info("FaceTracker closed")

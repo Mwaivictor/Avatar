@@ -1,13 +1,11 @@
-"""
-FastAPI server providing REST API and web interface for the avatar system.
-Includes endpoints for control, streaming, configuration, health monitoring,
-app detection, and permission management.
-"""
+"""FastAPI server — REST API and web interface for the avatar system."""
 
 import asyncio
 import io
 import logging
 import os
+import sys
+import time
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -16,18 +14,16 @@ import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
 from config import AppConfig
 from app.controller import AvatarController
-from app.permissions import PermissionManager, KNOWN_APPS
-from app.app_detector import detect_running_apps
+from app.output.virtual_camera import detect_virtual_camera
+from app.output.virtual_microphone import detect_virtual_microphone
 
 logger = logging.getLogger(__name__)
 
 _controller: Optional[AvatarController] = None
 _config: Optional[AppConfig] = None
-_permissions: Optional[PermissionManager] = None
 
 
 def get_controller() -> AvatarController:
@@ -39,10 +35,9 @@ def get_controller() -> AvatarController:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle."""
-    global _controller, _config, _permissions
+    global _controller, _config
     _config = AppConfig()
     _controller = AvatarController(_config)
-    _permissions = PermissionManager()
 
     # Load default avatar if available
     if os.path.exists(_config.avatar_image_path):
@@ -54,8 +49,6 @@ async def lifespan(app: FastAPI):
     # Shutdown
     if _controller and _controller.is_running:
         _controller.stop()
-    if _permissions:
-        _permissions.revoke_all()
     logger.info("Avatar system shut down")
 
 
@@ -105,25 +98,14 @@ async def start_pipeline(
     if ctrl.is_running:
         return {"message": "Pipeline already running"}
 
-    # Permission gate: require at least one granted permission
-    if not _permissions.any_granted:
-        raise HTTPException(
-            status_code=403,
-            detail="No permissions granted. Grant access to at least one application before starting.",
-        )
-
-    # Only enable virtual devices that have permission
-    cam_allowed = enable_virtual_cam and _permissions.is_camera_allowed()
-    mic_allowed = enable_virtual_mic and _permissions.is_microphone_allowed()
-
     ctrl.start(
-        enable_virtual_cam=cam_allowed,
-        enable_virtual_mic=mic_allowed,
+        enable_virtual_cam=enable_virtual_cam,
+        enable_virtual_mic=enable_virtual_mic,
     )
     return {
         "message": "Pipeline started",
-        "virtual_camera": cam_allowed,
-        "virtual_microphone": mic_allowed,
+        "virtual_camera": enable_virtual_cam,
+        "virtual_microphone": enable_virtual_mic,
     }
 
 
@@ -297,67 +279,55 @@ async def preview_frame():
     )
 
 
-# ─── Permission & App Detection ───────────────────────────────────
-
-class GrantRequest(BaseModel):
-    app_id: str
-    virtual_camera: bool = True
-    virtual_microphone: bool = True
-
-
-@app.get("/api/apps/detect")
-async def detect_apps():
-    """Scan for running video call / streaming applications."""
-    apps = detect_running_apps()
-    # Also return known apps as hints even if not running
-    known = [
-        {"app_id": k, "display_name": v["display_name"], "icon": v["icon"]}
-        for k, v in KNOWN_APPS.items()
-        if k != "other"
-    ]
-    return {"apps": apps, "known_apps": known}
-
-
-@app.get("/api/permissions")
-async def list_permissions():
-    """List all current permission records."""
-    return {"permissions": _permissions.get_all_permissions()}
-
-
-@app.get("/api/permissions/status")
-async def permission_status():
-    """Quick summary: is anything granted?"""
-    return _permissions.get_status_summary()
-
-
-@app.post("/api/permissions/grant")
-async def grant_permission(req: GrantRequest):
-    """Grant virtual device access for a specific app."""
-    record = _permissions.grant_permission(
-        req.app_id,
-        virtual_camera=req.virtual_camera,
-        virtual_microphone=req.virtual_microphone,
-    )
-    return {"message": f"Permission granted for {record.app_name}", "record": record.to_dict()}
-
-
-@app.post("/api/permissions/revoke")
-async def revoke_permission(app_id: str):
-    """Revoke permission for a specific app."""
-    record = _permissions.revoke_permission(app_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="No permission found for that app")
-    return {"message": f"Permission revoked for {record.app_name}", "record": record.to_dict()}
-
-
-@app.post("/api/permissions/revoke-all")
-async def revoke_all():
-    """Revoke all granted permissions and stop pipeline if running."""
-    _permissions.revoke_all()
+def _generate_webcam_mjpeg():
+    """Generator that yields MJPEG frames from the raw webcam input."""
     ctrl = get_controller()
+    while ctrl.is_running:
+        frame = ctrl.get_preview_frame()
+        if frame is None:
+            time.sleep(0.03)
+            continue
+        _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        yield (
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n"
+            + buffer.tobytes()
+            + b"\r\n"
+        )
+
+
+@app.get("/api/stream/webcam")
+async def webcam_stream():
+    """MJPEG stream of raw webcam input with face-tracking overlay."""
+    return StreamingResponse(
+        _generate_webcam_mjpeg(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+# ─── Virtual Devices ──────────────────────────────────────────────
+
+@app.get("/api/devices")
+async def get_virtual_devices():
+    """Detect available virtual camera and microphone devices.
+
+    Returns the device names as they appear in video call apps so the
+    user knows exactly which device to select in Zoom, Meet, Teams, etc.
+    """
+    cam_info = detect_virtual_camera()
+    mic_info = detect_virtual_microphone()
+
+    ctrl = get_controller()
+    # If pipeline is running, override with actual active device names
     if ctrl.is_running:
-        ctrl.stop()
-    return {"message": "All permissions revoked, pipeline stopped"}
+        if ctrl._virtual_cam and ctrl._virtual_cam.device_name:
+            cam_info["device_name"] = ctrl._virtual_cam.device_name
+            cam_info["available"] = True
+
+    return {
+        "virtual_camera": cam_info,
+        "virtual_microphone": mic_info,
+    }
 
 
 # ─── Web Interface ────────────────────────────────────────────────

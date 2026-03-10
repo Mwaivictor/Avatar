@@ -6,17 +6,111 @@ On Windows, this requires a virtual audio cable driver such as:
 - VB-Audio Virtual Cable
 - Virtual Audio Cable (VAC)
 
-The module writes audio to the virtual device's input using PyAudio.
+The module writes audio to the virtual device's input using sounddevice.
 """
 
 import logging
+import sys
 import threading
 import queue
 from typing import Optional
 
 import numpy as np
+import sounddevice as sd
 
 logger = logging.getLogger(__name__)
+
+# Common virtual audio device name patterns across platforms
+_VIRTUAL_MIC_PATTERNS = [
+    "cable",           # VB-Audio Virtual Cable (Windows)
+    "virtual",         # Generic virtual audio drivers
+    "vb-audio",        # VB-Audio variants
+    "blackhole",       # BlackHole (macOS)
+    "soundflower",     # Soundflower (macOS legacy)
+    "pulse",           # PulseAudio virtual sink (Linux)
+    "pipewire",        # PipeWire virtual device (Linux)
+    "loopback",        # Loopback (macOS)
+]
+
+
+def detect_virtual_microphone() -> dict:
+    """Detect available virtual audio output devices.
+
+    Returns a dict with:
+        device_name: The name to select in video call apps as microphone
+        available: Whether a virtual audio device was found
+        device_index: sounddevice device index (or None)
+        all_candidates: List of all matching virtual devices
+        instructions: Setup instructions if not available
+    """
+    try:
+        devices = sd.query_devices()
+        candidates = []
+
+        for i, dev in enumerate(devices):
+            if dev["max_output_channels"] <= 0:
+                continue
+            name_lower = dev["name"].lower()
+            for pattern in _VIRTUAL_MIC_PATTERNS:
+                if pattern in name_lower:
+                    candidates.append({
+                        "index": i,
+                        "name": dev["name"],
+                        "channels": dev["max_output_channels"],
+                    })
+                    break
+
+        if candidates:
+            best = candidates[0]
+            # The output device on our side feeds into the virtual cable.
+            # In the call app, the user selects the cable's INPUT side as mic.
+            # For VB-Audio: we output to "CABLE Input", user selects "CABLE Output" in their app.
+            display_name = best["name"]
+            if "cable input" in display_name.lower():
+                display_name = display_name.replace("Input", "Output").replace("input", "Output")
+            return {
+                "device_name": display_name,
+                "available": True,
+                "device_index": best["index"],
+                "all_candidates": candidates,
+                "instructions": None,
+            }
+
+        # No virtual device found
+        if sys.platform == "win32":
+            return {
+                "device_name": "CABLE Output (VB-Audio Virtual Cable)",
+                "available": False,
+                "device_index": None,
+                "all_candidates": [],
+                "instructions": "Install VB-Audio Virtual Cable from https://vb-audio.com/Cable/",
+            }
+        elif sys.platform == "darwin":
+            return {
+                "device_name": "BlackHole 2ch",
+                "available": False,
+                "device_index": None,
+                "all_candidates": [],
+                "instructions": "Install BlackHole: brew install blackhole-2ch",
+            }
+        else:
+            return {
+                "device_name": "Avatar Virtual Microphone",
+                "available": False,
+                "device_index": None,
+                "all_candidates": [],
+                "instructions": "Create a PulseAudio/PipeWire virtual sink for audio routing",
+            }
+
+    except Exception as e:
+        logger.warning("Failed to detect virtual audio devices: %s", e)
+        return {
+            "device_name": "CABLE Output (VB-Audio Virtual Cable)",
+            "available": False,
+            "device_index": None,
+            "all_candidates": [],
+            "instructions": "Install sounddevice and a virtual audio cable driver",
+        }
 
 
 class VirtualMicrophoneOutput:
@@ -35,7 +129,6 @@ class VirtualMicrophoneOutput:
         self.channels = channels
         self.chunk_size = chunk_size
         self.device_name = device_name
-        self._audio_interface = None
         self._stream = None
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -44,46 +137,51 @@ class VirtualMicrophoneOutput:
 
     def _find_device_index(self) -> Optional[int]:
         """Find the output device index matching the configured device name."""
-        if self.device_name is None:
-            return None  # Use system default
+        if self.device_name is not None:
+            # User specified a device name — search for it
+            devices = sd.query_devices()
+            for i, info in enumerate(devices):
+                if (
+                    self.device_name.lower() in info["name"].lower()
+                    and info["max_output_channels"] > 0
+                ):
+                    logger.info(
+                        "Found virtual audio device: %s (index %d)",
+                        info["name"],
+                        i,
+                    )
+                    return i
 
-        for i in range(self._audio_interface.get_device_count()):
-            info = self._audio_interface.get_device_info_by_index(i)
-            if (
-                self.device_name.lower() in info["name"].lower()
-                and info["maxOutputChannels"] > 0
-            ):
-                logger.info(
-                    "Found virtual audio device: %s (index %d)",
-                    info["name"],
-                    i,
-                )
-                return i
+            logger.warning(
+                "Virtual audio device '%s' not found, trying auto-detect",
+                self.device_name,
+            )
 
-        logger.warning(
-            "Virtual audio device '%s' not found, using default",
-            self.device_name,
-        )
+        # Auto-detect virtual audio device
+        info = detect_virtual_microphone()
+        if info["available"] and info["device_index"] is not None:
+            logger.info(
+                "Auto-detected virtual audio device: %s (index %d)",
+                info["device_name"],
+                info["device_index"],
+            )
+            return info["device_index"]
+
+        logger.warning("No virtual audio device found, using system default")
         return None
 
     def start(self) -> None:
         """Open the audio output stream."""
-        import pyaudio
-
-        self._audio_interface = pyaudio.PyAudio()
         device_index = self._find_device_index()
 
-        kwargs = {
-            "format": pyaudio.paInt16,
-            "channels": self.channels,
-            "rate": self.sample_rate,
-            "output": True,
-            "frames_per_buffer": self.chunk_size,
-        }
-        if device_index is not None:
-            kwargs["output_device_index"] = device_index
-
-        self._stream = self._audio_interface.open(**kwargs)
+        self._stream = sd.OutputStream(
+            samplerate=self.sample_rate,
+            channels=self.channels,
+            blocksize=self.chunk_size,
+            dtype="float32",
+            device=device_index,
+        )
+        self._stream.start()
         self._running = True
         self._thread = threading.Thread(target=self._output_loop, daemon=True)
         self._thread.start()
@@ -98,9 +196,10 @@ class VirtualMicrophoneOutput:
         while self._running:
             try:
                 audio = self._queue.get(timeout=0.1)
-                # Convert float32 [-1, 1] to int16
-                int_data = (audio * 32768).astype(np.int16)
-                self._stream.write(int_data.tobytes())
+                # sounddevice expects float32 [-1, 1] shaped (frames, channels)
+                if audio.ndim == 1:
+                    audio = audio.reshape(-1, 1)
+                self._stream.write(audio)
                 self._chunk_count += 1
             except queue.Empty:
                 continue
@@ -138,10 +237,8 @@ class VirtualMicrophoneOutput:
         if self._thread is not None:
             self._thread.join(timeout=2.0)
         if self._stream is not None:
-            self._stream.stop_stream()
+            self._stream.stop()
             self._stream.close()
-        if self._audio_interface is not None:
-            self._audio_interface.terminate()
         logger.info(
             "Virtual microphone output stopped after %d chunks",
             self._chunk_count,

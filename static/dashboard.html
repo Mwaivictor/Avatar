@@ -1,967 +1,432 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avatar Transformation System</title>
-    <style>
-        :root {
-            --bg-primary: #0a0a0f;
-            --bg-card: #12121a;
-            --bg-elevated: #1a1a28;
-            --bg-input: #1e1e2e;
-            --border: #2a2a3e;
-            --border-active: #7c3aed;
-            --text-primary: #e8e8f0;
-            --text-secondary: #8888a0;
-            --text-muted: #555570;
-            --accent: #7c3aed;
-            --accent-hover: #6d28d9;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --info: #3b82f6;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avatar</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #0a0a0b;
+    --surface: #111113;
+    --surface2: #18181b;
+    --border: #27272a;
+    --text: #fafafa;
+    --text2: #a1a1aa;
+    --muted: #71717a;
+    --accent: #7c3aed;
+    --accent-hover: #6d28d9;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --radius: 10px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; -webkit-font-smoothing:antialiased; }
 
-        /* ─── Header ───────────────────────────────────────────────── */
-        .header {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            padding: 12px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .header-left { display: flex; align-items: center; gap: 16px; }
-        .header h1 { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
-        .header-badge {
-            font-size: 0.7rem;
-            background: var(--bg-elevated);
-            color: var(--text-secondary);
-            padding: 3px 10px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-        }
-        .header-right { display: flex; align-items: center; gap: 12px; }
-        .global-status {
-            display: flex; align-items: center; gap: 6px;
-            font-size: 0.85rem;
-        }
-        .pulse {
-            width: 8px; height: 8px; border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
+/* Header */
+.header { background:var(--surface); border-bottom:1px solid var(--border); height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; position:sticky; top:0; z-index:50; }
+.logo { display:flex; align-items:center; gap:10px; font-weight:700; font-size:0.95rem; }
+.logo-icon { width:28px; height:28px; background:linear-gradient(135deg,var(--accent),#a855f7); border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.status { display:flex; align-items:center; gap:7px; font-size:0.78rem; font-weight:500; padding:4px 12px; border-radius:20px; border:1px solid var(--border); color:var(--muted); }
+.status.on { color:var(--green); border-color:rgba(34,197,94,0.3); background:rgba(34,197,94,0.08); }
+.status-dot { width:6px; height:6px; border-radius:50%; background:var(--muted); }
+.status.on .status-dot { background:var(--green); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-        /* ─── Layout ───────────────────────────────────────────────── */
-        .main-layout {
-            display: grid;
-            grid-template-columns: 1fr 360px;
-            gap: 0;
-            min-height: calc(100vh - 50px);
-        }
-        .center-content {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .sidebar {
-            background: var(--bg-card);
-            border-left: 1px solid var(--border);
-            overflow-y: auto;
-            max-height: calc(100vh - 50px);
-        }
+/* Layout */
+.layout { display:grid; grid-template-columns:1fr 320px; min-height:calc(100vh - 52px); }
+.main { padding:16px; display:flex; flex-direction:column; gap:14px; }
+.sidebar { background:var(--surface); border-left:1px solid var(--border); overflow-y:auto; max-height:calc(100vh - 52px); }
 
-        /* ─── Permission Banner ────────────────────────────────────── */
-        .permission-banner {
-            background: linear-gradient(135deg, #1a1023, #0f1a2e);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            display: none;
-        }
-        .permission-banner.visible { display: block; }
-        .permission-banner h2 {
-            font-size: 1rem;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .permission-banner p {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin-bottom: 14px;
-            line-height: 1.5;
-        }
-        .detected-apps {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 14px;
-        }
-        .app-chip {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 8px 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.85rem;
-        }
-        .app-chip:hover { border-color: var(--accent); background: #1e1530; }
-        .app-chip.selected { border-color: var(--accent); background: #261a40; }
-        .app-chip .app-icon { font-size: 1.1rem; }
-        .app-chip .app-check {
-            width: 16px; height: 16px; border-radius: 4px;
-            border: 2px solid var(--border);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.7rem; color: white;
-            transition: all 0.2s;
-        }
-        .app-chip.selected .app-check {
-            background: var(--accent);
-            border-color: var(--accent);
-        }
-        .permission-options {
-            display: flex; gap: 12px; align-items: center;
-            margin-bottom: 14px;
-        }
-        .perm-toggle {
-            display: flex; align-items: center; gap: 6px;
-            font-size: 0.85rem; color: var(--text-secondary);
-        }
-        .perm-toggle input[type="checkbox"] {
-            accent-color: var(--accent);
-            width: 16px; height: 16px;
-        }
+/* Big start button area */
+.start-area { display:flex; align-items:center; justify-content:center; gap:12px; padding:8px 0; }
+.btn-start { padding:10px 32px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); font:600 0.85rem/1 'Inter',sans-serif; cursor:pointer; display:flex; align-items:center; gap:8px; transition:background 0.15s; }
+.btn-start:hover { background:var(--accent-hover); }
+.btn-start:disabled { opacity:0.4; cursor:not-allowed; }
+.btn-stop { padding:10px 24px; background:var(--red); color:#fff; border:none; border-radius:var(--radius); font:600 0.85rem/1 'Inter',sans-serif; cursor:pointer; display:none; align-items:center; gap:8px; transition:background 0.15s; }
+.btn-stop:hover { background:#dc2626; }
 
-        /* ─── Video Panel ──────────────────────────────────────────── */
-        .video-section {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            min-height: 300px;
-        }
-        .video-panel {
-            background: var(--bg-card);
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            overflow: hidden;
-            position: relative;
-        }
-        .video-panel.full-width { grid-column: 1 / -1; }
-        .video-label {
-            position: absolute;
-            top: 10px; left: 10px;
-            background: rgba(0,0,0,0.7);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            z-index: 2;
-        }
-        .video-panel img, .video-panel video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-            background: #000;
-            min-height: 200px;
-        }
-        .video-offline {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 200px;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
+/* Video grid */
+.video-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; flex:1; min-height:0; }
+.video-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; position:relative; aspect-ratio:4/3; }
+.video-box.highlight { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+.video-tag { position:absolute; top:8px; left:8px; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); padding:3px 10px; border-radius:5px; font-size:0.68rem; font-weight:600; color:var(--text2); z-index:2; letter-spacing:0.5px; text-transform:uppercase; }
+.video-tag .live-dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--green); margin-right:5px; animation:pulse 1.5s infinite; }
+.video-box video, .video-box img { width:100%; height:100%; object-fit:cover; display:block; background:#000; }
+.video-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:6px; color:var(--muted); font-size:0.78rem; }
+.video-placeholder svg { opacity:0.25; }
 
-        /* ─── Toolbar ──────────────────────────────────────────────── */
-        .toolbar {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
+/* Info bar */
+.info-bar { display:flex; gap:16px; align-items:center; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); font-size:0.78rem; color:var(--text2); flex-wrap:wrap; }
+.info-bar .sep { width:1px; height:16px; background:var(--border); }
+.info-item { display:flex; align-items:center; gap:5px; }
+.info-val { font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
 
-        /* ─── Buttons ──────────────────────────────────────────────── */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 9px 18px;
-            border: 1px solid transparent;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 600;
-            transition: all 0.15s;
-            white-space: nowrap;
-        }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-accent { background: var(--accent); color: #fff; }
-        .btn-accent:hover:not(:disabled) { background: var(--accent-hover); }
-        .btn-danger { background: var(--danger); color: #fff; }
-        .btn-danger:hover:not(:disabled) { background: #dc2626; }
-        .btn-outline {
-            background: transparent;
-            color: var(--text-secondary);
-            border-color: var(--border);
-        }
-        .btn-outline:hover:not(:disabled) {
-            border-color: var(--accent);
-            color: var(--text-primary);
-        }
-        .btn-success { background: var(--success); color: #fff; }
-        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+/* Sidebar sections */
+.sb-section { padding:16px; border-bottom:1px solid var(--border); }
+.sb-section:last-child { border:none; }
+.sb-title { font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:12px; }
 
-        /* ─── Sidebar Sections ─────────────────────────────────────── */
-        .sidebar-section {
-            border-bottom: 1px solid var(--border);
-            padding: 18px;
-        }
-        .sidebar-section h3 {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: var(--text-muted);
-            margin-bottom: 14px;
-        }
+/* Service dots */
+.svc-row { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:0.8rem; font-weight:500; }
+.svc-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.dot-ok { background:var(--green); box-shadow:0 0 6px rgba(34,197,94,0.4); }
+.dot-err { background:var(--red); }
+.dot-unk { background:var(--muted); }
+.svc-port { margin-left:auto; font-size:0.68rem; color:var(--muted); font-family:monospace; }
 
-        /* Stats */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-        .stat-card {
-            background: var(--bg-elevated);
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-        }
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent);
-            line-height: 1;
-        }
-        .stat-label {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
+/* Upload */
+.upload-zone { border:1.5px dashed var(--border); border-radius:var(--radius); padding:20px 12px; text-align:center; cursor:pointer; transition:all 0.15s; }
+.upload-zone:hover { border-color:var(--accent); background:rgba(124,58,237,0.06); }
+.upload-zone p { font-size:0.8rem; font-weight:500; color:var(--text2); }
+.upload-zone .hint { font-size:0.7rem; color:var(--muted); margin-top:3px; }
+.avatar-thumb { width:100%; max-height:120px; object-fit:contain; border-radius:8px; margin-bottom:8px; display:none; border:1px solid var(--border); }
 
-        /* Services */
-        .service-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 0;
-        }
-        .service-dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .dot-ok { background: var(--success); }
-        .dot-err { background: var(--danger); }
-        .dot-unknown { background: var(--text-muted); }
-        .service-name { font-size: 0.85rem; flex: 1; }
-        .service-model {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-        }
+/* Select & input */
+.sel { width:100%; padding:8px 10px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:8px; font:inherit; font-size:0.8rem; cursor:pointer; appearance:none; }
+.sel:focus { outline:none; border-color:var(--accent); }
+.inp { width:100%; padding:7px 10px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:8px; font:inherit; font-size:0.8rem; }
+.inp:focus { outline:none; border-color:var(--accent); }
+.inp::placeholder { color:var(--muted); }
+input[type="file"] { display:none; }
 
-        /* Permissions list */
-        .perm-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 0;
-            gap: 8px;
-        }
-        .perm-left { display: flex; align-items: center; gap: 8px; }
-        .perm-app-icon { font-size: 1.1rem; }
-        .perm-app-name { font-size: 0.85rem; }
-        .perm-status {
-            font-size: 0.7rem;
-            padding: 2px 8px;
-            border-radius: 4px;
-        }
-        .perm-granted { background: rgba(34,197,94,0.15); color: var(--success); }
-        .perm-revoked { background: rgba(239,68,68,0.15); color: var(--danger); }
-        .perm-pending { background: rgba(245,158,11,0.15); color: var(--warning); }
+/* Small btn */
+.btn-sm { width:100%; padding:7px 0; background:transparent; color:var(--text2); border:1px solid var(--border); border-radius:8px; font:500 0.78rem/1 'Inter',sans-serif; cursor:pointer; transition:all 0.12s; text-align:center; }
+.btn-sm:hover { border-color:var(--muted); color:var(--text); background:var(--surface2); }
 
-        /* Upload */
-        .upload-zone {
-            border: 2px dashed var(--border);
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .upload-zone:hover { border-color: var(--accent); }
-        .upload-zone p { font-size: 0.85rem; color: var(--text-secondary); }
-        .upload-zone .hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
-        .avatar-preview {
-            width: 100%; max-height: 140px;
-            object-fit: contain;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            display: none;
-        }
-        input[type="file"] { display: none; }
+/* Device tip */
+.device-tip { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:8px; }
+.device-tip .dt-label { font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted); margin-bottom:4px; }
+.device-tip .dt-name { font-size:0.82rem; font-weight:600; color:#a78bfa; word-break:break-word; }
 
-        /* Voice */
-        .voice-select {
-            width: 100%;
-            padding: 9px 12px;
-            background: var(--bg-input);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.85rem;
-            margin-bottom: 10px;
-        }
+/* Toast */
+.toast-box { position:fixed; bottom:16px; right:16px; z-index:999; display:flex; flex-direction:column; gap:6px; }
+.toast { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:0.8rem; font-weight:500; box-shadow:0 4px 16px rgba(0,0,0,0.5); animation:slideIn 0.25s ease; max-width:340px; display:flex; align-items:center; gap:6px; }
+.toast.ok { border-left:3px solid var(--green); }
+.toast.err { border-left:3px solid var(--red); }
+.toast.warn { border-left:3px solid var(--yellow); }
+.toast.info { border-left:3px solid #3b82f6; }
+@keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
 
-        /* Notification toast */
-        .toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .toast {
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 12px 18px;
-            font-size: 0.85rem;
-            animation: slideIn 0.3s ease;
-            max-width: 340px;
-        }
-        .toast.toast-success { border-left: 3px solid var(--success); }
-        .toast.toast-error { border-left: 3px solid var(--danger); }
-        .toast.toast-warning { border-left: 3px solid var(--warning); }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        /* Responsive */
-        @media (max-width: 900px) {
-            .main-layout { grid-template-columns: 1fr; }
-            .sidebar {
-                border-left: none;
-                border-top: 1px solid var(--border);
-                max-height: none;
-            }
-            .video-section { grid-template-columns: 1fr; }
-        }
-    </style>
+/* Responsive */
+@media(max-width:900px) {
+    .layout { grid-template-columns:1fr; }
+    .sidebar { border-left:none; border-top:1px solid var(--border); max-height:none; }
+    .video-grid { grid-template-columns:1fr; }
+}
+</style>
 </head>
 <body>
-    <!-- ═══ Header ═══════════════════════════════════════════════════ -->
-    <div class="header">
-        <div class="header-left">
-            <h1>&#x1f3ad; Avatar System</h1>
-            <span class="header-badge">EDUCATIONAL USE ONLY</span>
+
+<header class="header">
+    <div class="logo">
+        <div class="logo-icon">&#x1f3ad;</div>
+        <span>Avatar</span>
+    </div>
+    <div class="status" id="statusPill">
+        <div class="status-dot"></div>
+        <span id="statusText">Offline</span>
+    </div>
+</header>
+
+<div class="layout">
+<div class="main">
+
+    <!-- Controls -->
+    <div class="start-area">
+        <button class="btn-start" id="btnStart" onclick="startPipeline()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>
+            Start Avatar
+        </button>
+        <button class="btn-stop" id="btnStop" onclick="stopPipeline()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            Stop
+        </button>
+    </div>
+
+    <!-- Video -->
+    <div class="video-grid">
+        <div class="video-box" id="webcamBox">
+            <div class="video-tag"><span class="live-dot" id="camLive" style="display:none"></span>Your Camera</div>
+            <img id="webcamFeed" src="" alt="" style="display:none" />
+            <div class="video-placeholder" id="webcamOff">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                Click Start to begin
+            </div>
         </div>
-        <div class="header-right">
-            <div class="global-status">
-                <div class="pulse" id="global-pulse" style="background:var(--danger)"></div>
-                <span id="global-status-text">Offline</span>
+        <div class="video-box highlight" id="avatarBox">
+            <div class="video-tag"><span class="live-dot" id="avatarLive" style="display:none"></span>What Others See</div>
+            <img id="avatarFeed" src="" alt="" style="display:none" />
+            <div class="video-placeholder" id="avatarOff">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                Avatar preview appears here
             </div>
         </div>
     </div>
 
-    <!-- ═══ Main Layout ═════════════════════════════════════════════ -->
-    <div class="main-layout">
-        <div class="center-content">
+    <!-- Stats bar -->
+    <div class="info-bar" id="infoBar">
+        <div class="info-item">FPS <span class="info-val" id="sFps">--</span></div>
+        <div class="sep"></div>
+        <div class="info-item">A/V Drift <span class="info-val" id="sDrift">--</span> ms</div>
+        <div class="sep"></div>
+        <div class="info-item">Frames <span class="info-val" id="sFrames">0</span></div>
+        <div class="sep"></div>
+        <div class="info-item">Audio <span class="info-val" id="sAudio">0</span></div>
+    </div>
 
-            <!-- Permission Banner -->
-            <div class="permission-banner visible" id="permission-banner">
-                <h2>&#x1f512; Permission Required</h2>
-                <p>
-                    Before activating the avatar overlay, you must grant explicit permission
-                    for each application that will receive the virtual camera and microphone feed.
-                    Select the apps you want to use, then click <strong>Grant Access</strong>.
-                </p>
-                <div class="detected-apps" id="detected-apps">
-                    <span style="color:var(--text-muted);font-size:0.85rem">
-                        Scanning for running apps...
-                    </span>
-                </div>
-                <div class="permission-options">
-                    <label class="perm-toggle">
-                        <input type="checkbox" id="perm-camera" checked />
-                        Virtual Camera
-                    </label>
-                    <label class="perm-toggle">
-                        <input type="checkbox" id="perm-mic" checked />
-                        Virtual Microphone
-                    </label>
-                </div>
-                <div style="display:flex;gap:8px">
-                    <button class="btn btn-success btn-sm" onclick="grantSelectedPermissions()">
-                        &#x2705; Grant Access
-                    </button>
-                    <button class="btn btn-outline btn-sm" onclick="detectApps()">
-                        &#x1f50d; Rescan Apps
-                    </button>
-                    <button class="btn btn-outline btn-sm" onclick="grantManualApp()">
-                        &#x2795; Add Manually
-                    </button>
-                </div>
-            </div>
+</div>
 
-            <!-- Video Section -->
-            <div class="video-section">
-                <div class="video-panel">
-                    <div class="video-label">Webcam Input</div>
-                    <div class="video-offline" id="webcam-offline">Camera offline</div>
-                    <img id="webcam-feed" src="" alt="" style="display:none" />
-                </div>
-                <div class="video-panel">
-                    <div class="video-label">Avatar Output</div>
-                    <div class="video-offline" id="avatar-offline">Pipeline stopped</div>
-                    <img id="avatar-feed" src="" alt="" style="display:none" />
-                </div>
-            </div>
+<!-- Sidebar -->
+<div class="sidebar">
 
-            <!-- Toolbar -->
-            <div class="toolbar">
-                <button class="btn btn-accent" id="btn-start" onclick="startPipeline()">
-                    &#x25B6; Start Pipeline
-                </button>
-                <button class="btn btn-danger" id="btn-stop" onclick="stopPipeline()" disabled>
-                    &#x23F9; Stop Pipeline
-                </button>
-                <button class="btn btn-outline" onclick="checkServices()">
-                    &#x1f4e1; Check Services
-                </button>
-                <button class="btn btn-outline" onclick="detectApps()">
-                    &#x1f50d; Detect Apps
-                </button>
-                <button class="btn btn-danger btn-sm" onclick="revokeAllPermissions()" style="margin-left:auto">
-                    &#x1f6ab; Revoke All
-                </button>
-            </div>
+    <!-- Services -->
+    <div class="sb-section">
+        <div class="sb-title">Services</div>
+        <div class="svc-row"><div class="svc-dot dot-unk" id="dFace"></div> Face Animation <span class="svc-port">:8001</span></div>
+        <div class="svc-row"><div class="svc-dot dot-unk" id="dVoice"></div> Voice Conversion <span class="svc-port">:8002</span></div>
+        <div class="svc-row"><div class="svc-dot dot-unk" id="dLip"></div> Lip Sync <span class="svc-port">:8003</span></div>
+        <button class="btn-sm" style="margin-top:10px" onclick="checkServices()">Check Services</button>
+    </div>
+
+    <!-- Avatar -->
+    <div class="sb-section">
+        <div class="sb-title">Avatar Image</div>
+        <img class="avatar-thumb" id="avatarThumb" src="" alt="" />
+        <div class="upload-zone" onclick="document.getElementById('avatarFile').click()">
+            <p>Upload Face Image</p>
+            <p class="hint">PNG or JPG</p>
         </div>
+        <input type="file" id="avatarFile" accept="image/*" onchange="uploadAvatar(this)" />
+    </div>
 
-        <!-- ═══ Sidebar ═════════════════════════════════════════════ -->
-        <div class="sidebar">
-
-            <!-- Performance -->
-            <div class="sidebar-section">
-                <h3>Performance</h3>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-fps">0</div>
-                        <div class="stat-label">Processing FPS</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-drift">0</div>
-                        <div class="stat-label">A/V Drift (ms)</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-frames">0</div>
-                        <div class="stat-label">Video Frames</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-audio">0</div>
-                        <div class="stat-label">Audio Chunks</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI Services -->
-            <div class="sidebar-section">
-                <h3>AI Services</h3>
-                <div class="service-row">
-                    <div class="service-dot dot-unknown" id="svc-face"></div>
-                    <span class="service-name">Face Animation</span>
-                    <span class="service-model">FOMM</span>
-                </div>
-                <div class="service-row">
-                    <div class="service-dot dot-unknown" id="svc-voice"></div>
-                    <span class="service-name">Voice Conversion</span>
-                    <span class="service-model">HuBERT</span>
-                </div>
-                <div class="service-row">
-                    <div class="service-dot dot-unknown" id="svc-lip"></div>
-                    <span class="service-name">Lip Sync</span>
-                    <span class="service-model">Wav2Lip</span>
-                </div>
-            </div>
-
-            <!-- Active Permissions -->
-            <div class="sidebar-section">
-                <h3>Active Permissions</h3>
-                <div id="active-permissions">
-                    <p style="font-size:0.85rem;color:var(--text-muted)">
-                        No permissions granted yet
-                    </p>
-                </div>
-            </div>
-
-            <!-- Avatar -->
-            <div class="sidebar-section">
-                <h3>Avatar</h3>
-                <img class="avatar-preview" id="avatar-preview" src="" alt="" />
-                <div class="upload-zone" onclick="document.getElementById('avatar-input').click()">
-                    <p>&#x1f5bc; Upload Avatar Image</p>
-                    <p class="hint">PNG or JPG, any resolution</p>
-                </div>
-                <input type="file" id="avatar-input" accept="image/*" onchange="uploadAvatar(this)" />
-            </div>
-
-            <!-- Voice -->
-            <div class="sidebar-section">
-                <h3>Voice Profile</h3>
-
-                <!-- Preset voices -->
-                <select class="voice-select" id="speaker-select">
-                    <option value="default">Default Voice (No Change)</option>
-                    <option value="male_1">Male Deep</option>
-                    <option value="male_2">Male Medium</option>
-                    <option value="female_1">Female Bright</option>
-                    <option value="female_2">Female Warm</option>
-                </select>
-                <button class="btn btn-outline btn-sm" style="width:100%" onclick="setSpeaker()">
-                    Apply Voice
-                </button>
-
-                <!-- Upload custom voice -->
-                <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
-                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.4rem">
-                        Or upload a voice sample (.wav, 1-10s of speech):
-                    </label>
-                    <div style="display:flex;gap:0.4rem;align-items:center">
-                        <input type="text" id="custom-voice-name" placeholder="Profile name"
-                               style="flex:1;padding:0.3rem 0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.8rem" />
-                    </div>
-                    <input type="file" id="voice-input" accept=".wav,audio/wav" style="display:none"
-                           onchange="uploadVoice(this)" />
-                    <button class="btn btn-outline btn-sm" style="width:100%;margin-top:0.4rem"
-                            onclick="document.getElementById('voice-input').click()">
-                        🎤 Upload Voice Sample
-                    </button>
-                    <div id="voice-upload-status" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem"></div>
-                </div>
-            </div>
-
+    <!-- Voice -->
+    <div class="sb-section">
+        <div class="sb-title">Voice</div>
+        <select class="sel" id="voiceSel">
+            <option value="default">Default (No Change)</option>
+            <option value="male_1">Male Deep</option>
+            <option value="male_2">Male Medium</option>
+            <option value="female_1">Female Bright</option>
+            <option value="female_2">Female Warm</option>
+        </select>
+        <button class="btn-sm" style="margin-top:6px" onclick="setVoice()">Apply</button>
+        <div style="margin-top:10px">
+            <input class="inp" id="voiceName" placeholder="Custom profile name" style="margin-bottom:6px" />
+            <button class="btn-sm" onclick="document.getElementById('voiceFile').click()">Upload .wav Sample</button>
+            <input type="file" id="voiceFile" accept=".wav,audio/wav" onchange="uploadVoice(this)" />
+            <div id="voiceStatus" style="font-size:0.7rem;color:var(--muted);margin-top:5px"></div>
         </div>
     </div>
 
-    <!-- Toast container -->
-    <div class="toast-container" id="toast-container"></div>
+    <!-- Device guide -->
+    <div class="sb-section">
+        <div class="sb-title">Use in Video Calls</div>
+        <p style="font-size:0.78rem;color:var(--text2);line-height:1.6;margin-bottom:10px">
+            In Google Meet, Zoom, Teams etc. open settings and select:
+        </p>
+        <div class="device-tip">
+            <div class="dt-label">Camera</div>
+            <div class="dt-name" id="tipCam">OBS Virtual Camera</div>
+        </div>
+        <div class="device-tip" style="margin-top:6px">
+            <div class="dt-label">Microphone</div>
+            <div class="dt-name" id="tipMic">CABLE Output (VB-Audio)</div>
+        </div>
+        <p style="font-size:0.7rem;color:var(--muted);margin-top:8px;line-height:1.5">
+            Start the avatar first, then select these devices in your call app.
+        </p>
+    </div>
 
-    <!-- ═══ JavaScript ══════════════════════════════════════════════ -->
-    <script>
-    // ─── State ────────────────────────────────────────────────────
-    let pipelineRunning = false;
-    let selectedApps = new Set();
-    let pollingInterval = null;
-    let detectedApps = [];
+</div>
+</div>
 
-    // ─── Toast notifications ──────────────────────────────────────
-    function toast(message, type = 'success') {
-        const container = document.getElementById('toast-container');
-        const el = document.createElement('div');
-        el.className = `toast toast-${type}`;
-        el.textContent = message;
-        container.appendChild(el);
-        setTimeout(() => el.remove(), 4000);
+<div class="toast-box" id="toasts"></div>
+
+<script>
+let running = false;
+let poll = null;
+
+
+/* ── Toast ─────────────────────────────────────── */
+function toast(msg, type) {
+    const c = document.getElementById('toasts');
+    const el = document.createElement('div');
+    el.className = 'toast ' + (type||'ok');
+    el.textContent = msg;
+    c.appendChild(el);
+    setTimeout(() => { el.style.opacity='0'; el.style.transform='translateX(20px)'; }, 3200);
+    setTimeout(() => el.remove(), 3600);
+}
+
+/* ── Pipeline ──────────────────────────────────── */
+async function startPipeline() {
+    try {
+        const r = await fetch('/api/pipeline/start', { method:'POST' });
+        const d = await r.json();
+        if (!r.ok) { toast(d.detail||'Start failed','err'); return; }
+        toast(d.message||'Pipeline started');
+        setRunning(true);
+    } catch(e) { toast('Failed to start','err'); }
+}
+async function stopPipeline() {
+    try {
+        const r = await fetch('/api/pipeline/stop', { method:'POST' });
+        const d = await r.json();
+        toast(d.message||'Stopped','info');
+        setRunning(false);
+    } catch(e) { toast('Failed to stop','err'); }
+}
+function setRunning(on) {
+    running = on;
+    const pill = document.getElementById('statusPill');
+    document.getElementById('statusText').textContent = on ? 'Live' : 'Offline';
+    pill.className = on ? 'status on' : 'status';
+    document.getElementById('btnStart').style.display = on ? 'none' : 'flex';
+    document.getElementById('btnStop').style.display = on ? 'flex' : 'none';
+
+    if (on) {
+        // Show webcam feed from server (OpenCV capture)
+        const wcImg = document.getElementById('webcamFeed');
+        wcImg.src = '/api/stream/webcam?' + Date.now();
+        wcImg.style.display = 'block';
+        document.getElementById('webcamOff').style.display = 'none';
+        document.getElementById('camLive').style.display = 'inline-block';
+
+        // Show avatar output feed
+        const avImg = document.getElementById('avatarFeed');
+        avImg.src = '/api/stream/video?' + Date.now();
+        avImg.style.display = 'block';
+        document.getElementById('avatarOff').style.display = 'none';
+        document.getElementById('avatarLive').style.display = 'inline-block';
+        startPoll();
+    } else {
+        document.getElementById('webcamFeed').style.display = 'none';
+        document.getElementById('webcamOff').style.display = 'flex';
+        document.getElementById('camLive').style.display = 'none';
+
+        document.getElementById('avatarFeed').style.display = 'none';
+        document.getElementById('avatarOff').style.display = 'flex';
+        document.getElementById('avatarLive').style.display = 'none';
+        stopPoll();
+        document.getElementById('sFps').textContent = '--';
+        document.getElementById('sDrift').textContent = '--';
     }
+}
 
-    // ─── App detection & permission ───────────────────────────────
-    async function detectApps() {
-        try {
-            const res = await fetch('/api/apps/detect');
-            const data = await res.json();
-            detectedApps = data.apps || [];
-            renderDetectedApps();
-            if (detectedApps.length === 0) {
-                toast('No video call apps detected. You can add manually.', 'warning');
-            } else {
-                toast(`Found ${detectedApps.length} app(s)`, 'success');
-            }
-        } catch {
-            toast('App detection failed', 'error');
+/* ── Polling ───────────────────────────────────── */
+function startPoll() { if(!poll) poll = setInterval(pollStatus, 1500); }
+function stopPoll() { if(poll){clearInterval(poll);poll=null;} }
+async function pollStatus() {
+    try {
+        const r = await fetch('/api/status');
+        const d = await r.json();
+        if (!d.running && running) { setRunning(false); return; }
+        const s = d.stats;
+        document.getElementById('sFps').textContent = s.processing_fps||'--';
+        document.getElementById('sDrift').textContent = s.av_drift_ms||'--';
+        document.getElementById('sFrames').textContent = (s.frames_processed||0).toLocaleString();
+        document.getElementById('sAudio').textContent = (s.audio_chunks_processed||0).toLocaleString();
+        if (s.services) updateSvcDots(s.services);
+    } catch(e){}
+}
+
+/* ── Services ──────────────────────────────────── */
+async function checkServices() {
+    try {
+        const r = await fetch('/api/services/health');
+        const d = await r.json();
+        updateSvcDots(d.services);
+        const n = Object.values(d.services).filter(Boolean).length;
+        toast(n+'/3 services healthy', n===3?'ok':'warn');
+    } catch(e) { toast('Cannot reach server','err'); }
+}
+function updateSvcDots(s) {
+    const map = {face_animation:'dFace', voice_conversion:'dVoice', lip_sync:'dLip'};
+    for (const [k,id] of Object.entries(map)) {
+        const el = document.getElementById(id);
+        el.className = 'svc-dot ' + (s[k]===true?'dot-ok':s[k]===false?'dot-err':'dot-unk');
+    }
+}
+
+/* ── Avatar upload ─────────────────────────────── */
+async function uploadAvatar(inp) {
+    if (!inp.files.length) return;
+    const fd = new FormData(); fd.append('file', inp.files[0]);
+    try {
+        const r = await fetch('/api/avatar/upload', { method:'POST', body:fd });
+        const d = await r.json();
+        if (!r.ok) { toast(d.detail||'Upload failed','err'); return; }
+        toast('Avatar uploaded');
+        const thumb = document.getElementById('avatarThumb');
+        thumb.src = URL.createObjectURL(inp.files[0]);
+        thumb.style.display = 'block';
+    } catch(e) { toast('Upload failed','err'); }
+}
+
+/* ── Voice ─────────────────────────────────────── */
+async function setVoice() {
+    const id = document.getElementById('voiceSel').value;
+    try {
+        await fetch('/api/voice/speaker?speaker_id='+encodeURIComponent(id), { method:'POST' });
+        toast('Voice set to "'+id+'"');
+    } catch(e) { toast('Failed','err'); }
+}
+async function uploadVoice(inp) {
+    if (!inp.files.length) return;
+    let sid = document.getElementById('voiceName').value.trim().replace(/[^a-zA-Z0-9_-]/g,'_');
+    if (!sid) sid = 'custom_'+Date.now();
+    const st = document.getElementById('voiceStatus');
+    st.textContent = 'Analyzing voice…'; st.style.color='var(--muted)';
+    const fd = new FormData(); fd.append('file', inp.files[0]);
+    try {
+        const r = await fetch('/api/voice/upload?speaker_id='+encodeURIComponent(sid), { method:'POST', body:fd });
+        const d = await r.json();
+        if (!r.ok) { st.textContent=d.detail||'Failed'; st.style.color='var(--red)'; toast(d.detail||'Failed','err'); return; }
+        st.textContent='Created "'+sid+'"'; st.style.color='var(--green)';
+        toast('Voice profile created');
+        await refreshVoices();
+        document.getElementById('voiceSel').value = sid;
+    } catch(e) { st.textContent='Failed'; st.style.color='var(--red)'; toast('Upload failed','err'); }
+    inp.value = '';
+}
+async function refreshVoices() {
+    try {
+        const r = await fetch('/api/voice/speakers');
+        const d = await r.json();
+        const sel = document.getElementById('voiceSel');
+        const cur = sel.value;
+        const labels = { default:'Default (No Change)', male_1:'Male Deep', male_2:'Male Medium', female_1:'Female Bright', female_2:'Female Warm' };
+        sel.innerHTML = '';
+        for (const [id,info] of Object.entries(d.speakers)) {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = labels[id] || (info.name||id)+' ('+Math.round(info.f0_mean||0)+' Hz)';
+            sel.appendChild(opt);
         }
-    }
+        if ([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+    } catch(e){}
+}
 
-    function renderDetectedApps() {
-        const container = document.getElementById('detected-apps');
-        if (detectedApps.length === 0) {
-            container.innerHTML = `
-                <span style="color:var(--text-muted);font-size:0.85rem">
-                    No apps detected. Click "Add Manually" or "Rescan".
-                </span>`;
-            return;
-        }
-        container.innerHTML = detectedApps.map(app => {
-            const badge = app.source === 'browser_keyword' ? ' <small style="color:var(--accent);font-size:0.65rem">(auto-detected)</small>' : '';
-            return `
-            <div class="app-chip ${selectedApps.has(app.app_id) ? 'selected' : ''}"
-                 onclick="toggleApp('${app.app_id}')">
-                <span class="app-icon">${app.icon}</span>
-                <span>${app.display_name}${badge}</span>
-                <div class="app-check">${selectedApps.has(app.app_id) ? '✓' : ''}</div>
-            </div>
-        `}).join('');
+/* ── Devices ───────────────────────────────────── */
+async function loadDevices() {
+    try {
+        const r = await fetch('/api/devices');
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.virtual_camera) document.getElementById('tipCam').textContent = d.virtual_camera.device_name||'OBS Virtual Camera';
+        if (d.virtual_microphone) document.getElementById('tipMic').textContent = d.virtual_microphone.device_name||'CABLE Output (VB-Audio)';
+    } catch(e){}
+}
 
-        // Also add common apps that may not be detected but user might want
-        const extras = ['zoom', 'google_meet', 'teams', 'whatsapp', 'discord'];
-        const detectedIds = new Set(detectedApps.map(a => a.app_id));
-        const missing = extras.filter(id => !detectedIds.has(id));
-        if (missing.length > 0) {
-            const KNOWN = {
-                zoom: { icon: '📹', name: 'Zoom' },
-                google_meet: { icon: '🟢', name: 'Google Meet' },
-                teams: { icon: '🟣', name: 'Teams' },
-                whatsapp: { icon: '💬', name: 'WhatsApp' },
-                discord: { icon: '🎮', name: 'Discord' },
-            };
-            const extras_html = missing.map(id => {
-                const info = KNOWN[id];
-                return `<div class="app-chip ${selectedApps.has(id) ? 'selected' : ''}"
-                             onclick="toggleApp('${id}')" style="opacity:0.6">
-                    <span class="app-icon">${info.icon}</span>
-                    <span>${info.name}</span>
-                    <div class="app-check">${selectedApps.has(id) ? '✓' : ''}</div>
-                </div>`;
-            }).join('');
-            container.innerHTML += extras_html;
-        }
-    }
-
-    function toggleApp(appId) {
-        if (selectedApps.has(appId)) {
-            selectedApps.delete(appId);
-        } else {
-            selectedApps.add(appId);
-        }
-        renderDetectedApps();
-    }
-
-    async function grantSelectedPermissions() {
-        if (selectedApps.size === 0) {
-            toast('Select at least one application', 'warning');
-            return;
-        }
-        const camera = document.getElementById('perm-camera').checked;
-        const mic = document.getElementById('perm-mic').checked;
-
-        for (const appId of selectedApps) {
-            try {
-                await fetch('/api/permissions/grant', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        app_id: appId,
-                        virtual_camera: camera,
-                        virtual_microphone: mic,
-                    }),
-                });
-            } catch {
-                toast(`Failed to grant permission for ${appId}`, 'error');
-            }
-        }
-        toast(`Permission granted for ${selectedApps.size} app(s)`, 'success');
-        refreshPermissions();
-    }
-
-    function grantManualApp() {
-        const name = prompt('Enter application name (e.g. "zoom", "teams", "whatsapp"):');
-        if (!name) return;
-        const normalized = name.toLowerCase().replace(/\s+/g, '_');
-        selectedApps.add(normalized);
-        // Add to detected apps if not present
-        if (!detectedApps.find(a => a.app_id === normalized)) {
-            detectedApps.push({
-                app_id: normalized,
-                display_name: name,
-                icon: '📱',
-            });
-        }
-        renderDetectedApps();
-    }
-
-    async function revokePermission(appId) {
-        await fetch(`/api/permissions/revoke?app_id=${encodeURIComponent(appId)}`, {
-            method: 'POST',
-        });
-        toast('Permission revoked', 'warning');
-        refreshPermissions();
-    }
-
-    async function revokeAllPermissions() {
-        await fetch('/api/permissions/revoke-all', { method: 'POST' });
-        toast('All permissions revoked', 'warning');
-        refreshPermissions();
-    }
-
-    async function refreshPermissions() {
-        try {
-            const res = await fetch('/api/permissions');
-            const data = await res.json();
-            renderActivePermissions(data.permissions || []);
-        } catch {}
-    }
-
-    function renderActivePermissions(permissions) {
-        const container = document.getElementById('active-permissions');
-        const granted = permissions.filter(p => p.status === 'granted');
-        if (granted.length === 0) {
-            container.innerHTML = `<p style="font-size:0.85rem;color:var(--text-muted)">
-                No permissions granted yet</p>`;
-            return;
-        }
-        container.innerHTML = granted.map(p => `
-            <div class="perm-row">
-                <div class="perm-left">
-                    <span class="perm-app-name">${p.app_name}</span>
-                    <span class="perm-status perm-granted">
-                        ${p.virtual_camera ? '📷' : ''}${p.virtual_microphone ? '🎤' : ''}
-                    </span>
-                </div>
-                <button class="btn btn-outline btn-sm" onclick="revokePermission('${p.app_id}')">
-                    Revoke
-                </button>
-            </div>
-        `).join('');
-    }
-
-    // ─── Pipeline control ─────────────────────────────────────────
-    async function startPipeline() {
-        // Check if any permissions are granted
-        try {
-            const permRes = await fetch('/api/permissions/status');
-            const permData = await permRes.json();
-            if (!permData.any_granted) {
-                toast('Grant permission for at least one app before starting', 'warning');
-                return;
-            }
-        } catch {}
-
-        const res = await fetch('/api/pipeline/start', { method: 'POST' });
-        const data = await res.json();
-        toast(data.message);
-
-        pipelineRunning = true;
-        document.getElementById('btn-start').disabled = true;
-        document.getElementById('btn-stop').disabled = false;
-
-        // Start video feeds
-        const ts = Date.now();
-        const webcamEl = document.getElementById('webcam-feed');
-        const avatarEl = document.getElementById('avatar-feed');
-        webcamEl.src = '/api/stream/preview?' + ts;
-        webcamEl.style.display = 'block';
-        document.getElementById('webcam-offline').style.display = 'none';
-        avatarEl.src = '/api/stream/video?' + ts;
-        avatarEl.style.display = 'block';
-        document.getElementById('avatar-offline').style.display = 'none';
-
-        updateGlobalStatus(true);
-        startPolling();
-    }
-
-    async function stopPipeline() {
-        const res = await fetch('/api/pipeline/stop', { method: 'POST' });
-        const data = await res.json();
-        toast(data.message);
-
-        pipelineRunning = false;
-        document.getElementById('btn-start').disabled = false;
-        document.getElementById('btn-stop').disabled = true;
-
-        document.getElementById('webcam-feed').style.display = 'none';
-        document.getElementById('webcam-offline').style.display = 'flex';
-        document.getElementById('avatar-feed').style.display = 'none';
-        document.getElementById('avatar-offline').style.display = 'flex';
-
-        updateGlobalStatus(false);
-        stopPolling();
-    }
-
-    // ─── Services health ──────────────────────────────────────────
-    async function checkServices() {
-        try {
-            const res = await fetch('/api/services/health');
-            const data = await res.json();
-            updateServiceDots(data.services);
-            toast('Services checked');
-        } catch {
-            toast('Could not reach services', 'error');
-        }
-    }
-
-    function updateServiceDots(services) {
-        const map = {
-            face_animation: 'svc-face',
-            voice_conversion: 'svc-voice',
-            lip_sync: 'svc-lip',
-        };
-        for (const [key, id] of Object.entries(map)) {
-            const dot = document.getElementById(id);
-            dot.className = `service-dot ${services[key] ? 'dot-ok' : 'dot-err'}`;
-        }
-    }
-
-    // ─── Stats polling ────────────────────────────────────────────
-    function startPolling() {
-        if (pollingInterval) return;
-        pollingInterval = setInterval(pollStatus, 1500);
-    }
-    function stopPolling() {
-        if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-    }
-    async function pollStatus() {
-        try {
-            const res = await fetch('/api/status');
-            const data = await res.json();
-            const s = data.stats;
-            document.getElementById('stat-fps').textContent = s.processing_fps;
-            document.getElementById('stat-drift').textContent = s.av_drift_ms;
-            document.getElementById('stat-frames').textContent = s.frames_processed;
-            document.getElementById('stat-audio').textContent = s.audio_chunks_processed;
-            if (s.services) updateServiceDots(s.services);
-        } catch {}
-    }
-
-    // ─── Avatar upload ────────────────────────────────────────────
-    async function uploadAvatar(input) {
-        if (!input.files.length) return;
-        const form = new FormData();
-        form.append('file', input.files[0]);
-        const res = await fetch('/api/avatar/upload', { method: 'POST', body: form });
-        const data = await res.json();
-        toast(data.message);
-
-        // Show preview
-        const preview = document.getElementById('avatar-preview');
-        preview.src = URL.createObjectURL(input.files[0]);
-        preview.style.display = 'block';
-    }
-
-    // ─── Voice ────────────────────────────────────────────────────
-    async function setSpeaker() {
-        const id = document.getElementById('speaker-select').value;
-        await fetch(`/api/voice/speaker?speaker_id=${encodeURIComponent(id)}`, { method: 'POST' });
-        toast(`Voice set to ${id}`);
-    }
-
-    async function uploadVoice(input) {
-        if (!input.files.length) return;
-        const file = input.files[0];
-        const nameInput = document.getElementById('custom-voice-name');
-        let speakerId = nameInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-        if (!speakerId) speakerId = 'custom_' + Date.now();
-
-        const statusEl = document.getElementById('voice-upload-status');
-        statusEl.textContent = 'Analyzing voice...';
-
-        const form = new FormData();
-        form.append('file', file);
-
-        try {
-            const res = await fetch(`/api/voice/upload?speaker_id=${encodeURIComponent(speakerId)}`, {
-                method: 'POST',
-                body: form,
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                statusEl.textContent = data.detail || 'Upload failed';
-                toast(data.detail || 'Voice upload failed', 'error');
-                return;
-            }
-            const p = data.profile;
-            statusEl.textContent = `✓ Created "${speakerId}" — pitch: ${p.f0_mean} Hz`;
-            toast(`Voice profile "${speakerId}" created and applied!`, 'success');
-
-            // Add to dropdown and select it
-            await refreshSpeakerList();
-            document.getElementById('speaker-select').value = speakerId;
-        } catch (e) {
-            statusEl.textContent = 'Upload failed — check server';
-            toast('Voice upload failed', 'error');
-        }
-        input.value = '';
-    }
-
-    async function refreshSpeakerList() {
-        try {
-            const res = await fetch('/api/voice/speakers');
-            const data = await res.json();
-            const select = document.getElementById('speaker-select');
-            const current = select.value;
-            const LABELS = {
-                default: 'Default Voice (No Change)',
-                male_1: 'Male Deep',
-                male_2: 'Male Medium',
-                female_1: 'Female Bright',
-                female_2: 'Female Warm',
-            };
-            select.innerHTML = '';
-            for (const [id, info] of Object.entries(data.speakers)) {
-                const opt = document.createElement('option');
-                opt.value = id;
-                opt.textContent = LABELS[id] || `🎤 ${info.name || id} (${Math.round(info.f0_mean || 0)} Hz)`;
-                select.appendChild(opt);
-            }
-            // Restore previous selection if it still exists
-            if ([...select.options].some(o => o.value === current)) select.value = current;
-        } catch { /* ignore — use static list */ }
-    }
-
-    // ─── Global status ────────────────────────────────────────────
-    function updateGlobalStatus(running) {
-        const pulse = document.getElementById('global-pulse');
-        const text = document.getElementById('global-status-text');
-        if (running) {
-            pulse.style.background = 'var(--success)';
-            text.textContent = 'Pipeline Active';
-        } else {
-            pulse.style.background = 'var(--danger)';
-            text.textContent = 'Offline';
-        }
-    }
-
-    // ─── Init ─────────────────────────────────────────────────────
-    window.addEventListener('load', () => {
-        detectApps();
-        checkServices();
-        refreshPermissions();
-        refreshSpeakerList();
-    });
-    </script>
+/* ── Init ──────────────────────────────────────── */
+window.addEventListener('load', () => {
+    checkServices();
+    refreshVoices();
+    loadDevices();
+    fetch('/api/status').then(r=>r.json()).then(d => { if(d.running) setRunning(true); }).catch(()=>{});
+});
+</script>
 </body>
 </html>

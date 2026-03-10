@@ -7,6 +7,7 @@ import base64
 import logging
 from typing import Optional
 
+import httpx
 import numpy as np
 
 from app.services.base_client import BaseServiceClient
@@ -86,7 +87,14 @@ class VoiceConversionClient(BaseServiceClient):
             "speaker_id": speaker_id,
         }
         try:
-            response = await self.post("/speakers/analyze", json_data=payload)
+            # Voice analysis is a heavy one-time operation; use a longer timeout
+            client = await self._get_client()
+            response = await client.post(
+                "/speakers/analyze",
+                json=payload,
+                timeout=httpx.Timeout(120.0, connect=10.0),
+            )
+            response.raise_for_status()
             return response.json()
         except Exception:
             logger.exception("Voice analysis request failed")

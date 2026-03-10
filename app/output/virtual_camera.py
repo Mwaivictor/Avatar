@@ -4,11 +4,66 @@ Exposes the transformed video stream as a virtual webcam device.
 """
 
 import logging
+import sys
 from typing import Optional
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def detect_virtual_camera() -> dict:
+    """Detect available virtual camera backends and return device info.
+
+    Returns a dict with:
+        device_name: The name that appears in video call apps
+        available: Whether the backend is installed and working
+        backend: The backend being used (obs, unitycapture, v4l2loopback, etc.)
+        instructions: Setup instructions if not available
+    """
+    try:
+        import pyvirtualcam
+        # Try to create a temporary camera to detect the backend
+        cam = pyvirtualcam.Camera(width=640, height=480, fps=1, print_fps=False)
+        name = cam.device
+        backend = cam.backend
+        cam.close()
+        return {
+            "device_name": name,
+            "available": True,
+            "backend": backend,
+            "instructions": None,
+        }
+    except ImportError:
+        return {
+            "device_name": "OBS Virtual Camera",
+            "available": False,
+            "backend": None,
+            "instructions": "Install pyvirtualcam: pip install pyvirtualcam",
+        }
+    except Exception:
+        # pyvirtualcam installed but no backend available
+        if sys.platform == "win32":
+            return {
+                "device_name": "OBS Virtual Camera",
+                "available": False,
+                "backend": None,
+                "instructions": "Install OBS Studio and start it once to register the virtual camera",
+            }
+        elif sys.platform == "darwin":
+            return {
+                "device_name": "OBS Virtual Camera",
+                "available": False,
+                "backend": None,
+                "instructions": "Install OBS Studio for macOS virtual camera support",
+            }
+        else:
+            return {
+                "device_name": "Avatar Virtual Camera",
+                "available": False,
+                "backend": None,
+                "instructions": "Install v4l2loopback: sudo modprobe v4l2loopback devices=1 card_label='Avatar Virtual Camera'",
+            }
 
 
 class VirtualCameraOutput:

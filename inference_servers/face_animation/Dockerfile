@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx libglib2.0-0 curl && \
+    libgl1 libglib2.0-0 curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Install CPU-only PyTorch (no CUDA — keeps image ~1.5 GB smaller)

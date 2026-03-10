@@ -184,6 +184,7 @@ class AvatarController:
                     sample_rate=self.config.audio.sample_rate,
                     channels=self.config.audio.channels,
                     chunk_size=self.config.audio.chunk_size,
+                    device_name=self.config.virtual_mic_name or None,
                 )
                 self._virtual_mic.start()
             except Exception:

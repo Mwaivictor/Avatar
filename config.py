@@ -34,7 +34,7 @@ class ServiceEndpoints:
     lip_sync_url: str = os.getenv(
         "AVATAR_LIP_SYNC_URL", "http://localhost:8003"
     )
-    request_timeout: float = float(os.getenv("AVATAR_SERVICE_TIMEOUT", "0.5"))
+    request_timeout: float = float(os.getenv("AVATAR_SERVICE_TIMEOUT", "10"))
 
 
 @dataclass
@@ -53,6 +53,8 @@ class AppConfig:
     services: ServiceEndpoints = field(default_factory=ServiceEndpoints)
     rendering: RenderingConfig = field(default_factory=RenderingConfig)
     avatar_image_path: str = os.getenv("AVATAR_IMAGE_PATH", "static/avatars/default.png")
+    virtual_camera_name: str = os.getenv("AVATAR_VIRTUAL_CAMERA", "")
+    virtual_mic_name: str = os.getenv("AVATAR_VIRTUAL_MIC", "")
     debug: bool = os.getenv("AVATAR_DEBUG", "false").lower() == "true"
     host: str = os.getenv("AVATAR_HOST", "127.0.0.1")
     port: int = int(os.getenv("AVATAR_PORT", "8000"))

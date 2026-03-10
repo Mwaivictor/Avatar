@@ -38,3 +38,14 @@ checkpoints/
 static/avatars/*
 !static/avatars/.gitkeep
 !static/avatars/default.png
+
+# MediaPipe model cache
+app/tracking/models/*.task
+
+# Audio samples / temp files
+*.ogg
+*.wav
+*.mp3
+
+# Misc
+images.jpg
