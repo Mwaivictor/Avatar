@@ -28,7 +28,7 @@ services:
     volumes:
       - hubert-cache:/root/.cache/huggingface
     environment:
-      - VC_USE_HUBERT=1
+      - VC_USE_HUBERT=true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 10s

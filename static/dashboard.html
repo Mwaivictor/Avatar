@@ -260,11 +260,40 @@ input[type="file"] { display:none; }
         </div>
     </div>
 
+    <!-- Voice Test -->
+    <div class="sb-section">
+        <div class="sb-title">Test Voice</div>
+        <p style="font-size:0.75rem;color:var(--text2);line-height:1.5;margin-bottom:10px">
+            Record a clip, pick a voice, and listen to the result.
+        </p>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="btn-sm" id="btnRecord" onclick="toggleRecord()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px">
+                <span id="recDot" style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>
+                <span id="recLabel">Record</span>
+            </button>
+        </div>
+        <select class="sel" id="testVoiceSel" style="margin-bottom:8px">
+            <option value="default">Default (No Change)</option>
+        </select>
+        <button class="btn-sm" id="btnTestConvert" onclick="testConvert()" disabled>Convert with Selected Voice</button>
+        <div id="testPlayers" style="display:none;margin-top:10px">
+            <div style="margin-bottom:6px">
+                <div style="font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:3px">Original</div>
+                <audio id="audioOriginal" controls style="width:100%;height:32px"></audio>
+            </div>
+            <div>
+                <div style="font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:3px" id="convertedLabel">Converted</div>
+                <audio id="audioConverted" controls style="width:100%;height:32px"></audio>
+            </div>
+        </div>
+        <div id="testStatus" style="font-size:0.7rem;color:var(--muted);margin-top:5px"></div>
+    </div>
+
     <!-- Device guide -->
     <div class="sb-section">
         <div class="sb-title">Use in Video Calls</div>
         <p style="font-size:0.78rem;color:var(--text2);line-height:1.6;margin-bottom:10px">
-            In Google Meet, Zoom, Teams etc. open settings and select:
+            In Google Meet, Zoom, Teams etc. open <strong>Settings</strong> and change:
         </p>
         <div class="device-tip">
             <div class="dt-label">Camera</div>
@@ -273,6 +302,14 @@ input[type="file"] { display:none; }
         <div class="device-tip" style="margin-top:6px">
             <div class="dt-label">Microphone</div>
             <div class="dt-name" id="tipMic">CABLE Output (VB-Audio)</div>
+        </div>
+        <div style="margin-top:10px;padding:10px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px">
+            <p style="font-size:0.75rem;font-weight:600;color:var(--red);margin-bottom:4px">Important</p>
+            <p style="font-size:0.72rem;color:var(--text2);line-height:1.5;margin:0">
+                You <strong>must</strong> select OBS Virtual Camera as your camera in the call app.
+                Do NOT use your physical webcam &mdash; Avatar is already using it.
+                If you see "camera in use by another app", switch to OBS Virtual Camera in your call settings.
+            </p>
         </div>
         <p style="font-size:0.7rem;color:var(--muted);margin-top:8px;line-height:1.5">
             Start the avatar first, then select these devices in your call app.
@@ -518,7 +555,128 @@ async function refreshVoices() {
             sel.appendChild(opt);
         }
         if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+        // Mirror into test voice selector
+        const tSel = document.getElementById('testVoiceSel');
+        const tCur = tSel.value;
+        tSel.innerHTML = sel.innerHTML;
+        if ([...tSel.options].some(o => o.value === tCur)) tSel.value = tCur;
     } catch(e) { console.error('refreshVoices failed', e); }
+}
+
+/* ── Voice Test ────────────────────────────────── */
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordedBlob = null;
+
+async function toggleRecord() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        return;
+    }
+    // Start recording
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+            document.getElementById('recLabel').textContent = 'Record';
+            document.getElementById('recDot').style.background = 'var(--red)';
+            document.getElementById('recDot').style.animation = '';
+            document.getElementById('btnTestConvert').disabled = false;
+            // Show original playback
+            const origAudio = document.getElementById('audioOriginal');
+            origAudio.src = URL.createObjectURL(recordedBlob);
+            document.getElementById('testPlayers').style.display = 'block';
+            document.getElementById('audioConverted').src = '';
+            document.getElementById('testStatus').textContent = 'Recorded. Click Convert to hear the voice conversion.';
+            document.getElementById('testStatus').style.color = 'var(--green)';
+        };
+        mediaRecorder.start();
+        document.getElementById('recLabel').textContent = 'Stop';
+        document.getElementById('recDot').style.animation = 'pulse 1s infinite';
+        document.getElementById('testStatus').textContent = 'Recording...';
+        document.getElementById('testStatus').style.color = 'var(--red)';
+        document.getElementById('btnTestConvert').disabled = true;
+    } catch(e) {
+        toast('Microphone access denied','err');
+    }
+}
+
+async function testConvert() {
+    if (!recordedBlob) { toast('Record something first','err'); return; }
+    const st = document.getElementById('testStatus');
+    st.textContent = 'Converting...'; st.style.color = 'var(--muted)';
+    document.getElementById('btnTestConvert').disabled = true;
+
+    try {
+        // Convert webm to wav using AudioContext
+        const arrayBuf = await recordedBlob.arrayBuffer();
+        const audioCtx = new AudioContext({ sampleRate: 16000 });
+        const decoded = await audioCtx.decodeAudioData(arrayBuf);
+        const pcm = decoded.getChannelData(0); // float32 mono
+
+        // Encode as 16-bit PCM WAV
+        const wavBuf = encodeWav(pcm, 16000);
+        const wavBlob = new Blob([wavBuf], { type: 'audio/wav' });
+
+        // Update original player with proper WAV too
+        document.getElementById('audioOriginal').src = URL.createObjectURL(wavBlob);
+
+        // Send to server
+        const fd = new FormData();
+        fd.append('file', wavBlob, 'test.wav');
+        const sid = document.getElementById('testVoiceSel').value;
+        const url = sid && sid !== 'default' ? '/api/voice/test?speaker_id=' + encodeURIComponent(sid) : '/api/voice/test';
+        const r = await fetch(url, { method: 'POST', body: fd });
+
+        if (!r.ok) {
+            const d = await r.json();
+            st.textContent = d.detail || 'Conversion failed'; st.style.color = 'var(--red)';
+            toast(d.detail || 'Conversion failed', 'err');
+            return;
+        }
+
+        const convertedBlob = await r.blob();
+        document.getElementById('audioConverted').src = URL.createObjectURL(convertedBlob);
+        const voiceName = document.getElementById('testVoiceSel').selectedOptions[0].textContent;
+        document.getElementById('convertedLabel').textContent = 'Converted (' + voiceName + ')';
+        st.textContent = 'Done — play both to compare.';
+        st.style.color = 'var(--green)';
+        audioCtx.close();
+    } catch(e) {
+        st.textContent = 'Failed'; st.style.color = 'var(--red)';
+        toast('Voice test failed', 'err');
+        console.error(e);
+    } finally {
+        document.getElementById('btnTestConvert').disabled = false;
+    }
+}
+
+function encodeWav(samples, sampleRate) {
+    const buf = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buf);
+    const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+    for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    return buf;
 }
 
 /* ── Devices ───────────────────────────────────── */

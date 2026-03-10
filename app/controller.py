@@ -290,9 +290,6 @@ class AvatarController:
 
     def _audio_processing_loop(self) -> None:
         """Main audio processing loop running in its own thread."""
-        asyncio.set_event_loop(asyncio.new_event_loop())
-        loop = asyncio.get_event_loop()
-
         while self._running:
             # Accumulate a reasonable chunk for processing
             audio = self._audio_capture.read_accumulate(4)
@@ -303,10 +300,11 @@ class AvatarController:
             timestamp = time.monotonic()
             converted = None
 
-            # Voice conversion through AI service
+            # Voice conversion through AI service (synchronous — avoids
+            # cross-event-loop issues with the shared async httpx client)
             try:
-                converted = loop.run_until_complete(
-                    self._voice_conv.convert(audio, self.config.audio.sample_rate)
+                converted = self._voice_conv.convert_sync(
+                    audio, self.config.audio.sample_rate
                 )
             except Exception:
                 logger.debug("Voice conversion service unavailable")

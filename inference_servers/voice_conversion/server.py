@@ -70,6 +70,7 @@ class ProfileRequest(BaseModel):
     spectral_tilt: float = 1.0
     formant_shift: float = 1.0
     gain: float = 1.0
+    breathiness: float = 0.0
 
 
 class AnalyzeRequest(BaseModel):
@@ -130,6 +131,7 @@ async def add_speaker(req: ProfileRequest):
         spectral_tilt=req.spectral_tilt,
         formant_shift=req.formant_shift,
         gain=req.gain,
+        breathiness=req.breathiness,
     )
     pipeline.add_profile(req.speaker_id, profile)
     return {"message": f"Speaker '{req.speaker_id}' added"}
@@ -154,6 +156,7 @@ async def analyze_voice(req: AnalyzeRequest):
     params = pipeline.vocoder.analyze(audio)
     f0 = params["f0"]
     sp = params["sp"]
+    ap = params["ap"]
 
     # Extract statistics from voiced frames only
     voiced = f0 > 0
@@ -175,6 +178,12 @@ async def analyze_voice(req: AnalyzeRequest):
     avg_f0 = 150.0
     formant_shift = float(np.clip(f0_mean / avg_f0, 0.6, 1.8))
 
+    # Estimate breathiness from mean aperiodicity of voiced frames
+    # Aperiodicity values: 0 = fully periodic (resonant), 1 = fully noisy
+    mean_ap = float(np.mean(ap[voiced]))
+    # Map to a -0.3 to +0.3 scale relative to typical value (~0.1)
+    breathiness = float(np.clip((mean_ap - 0.1) * 3.0, -0.3, 0.3))
+
     profile = SpeakerProfile(
         name=req.speaker_id,
         f0_mean=f0_mean,
@@ -182,6 +191,7 @@ async def analyze_voice(req: AnalyzeRequest):
         spectral_tilt=spectral_tilt,
         formant_shift=formant_shift,
         gain=1.0,
+        breathiness=breathiness,
     )
     pipeline.add_profile(req.speaker_id, profile)
 
@@ -193,6 +203,7 @@ async def analyze_voice(req: AnalyzeRequest):
             "f0_std": round(f0_std, 1),
             "spectral_tilt": round(spectral_tilt, 3),
             "formant_shift": round(formant_shift, 3),
+            "breathiness": round(breathiness, 3),
         },
     }
 

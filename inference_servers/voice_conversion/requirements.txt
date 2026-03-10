@@ -7,3 +7,4 @@ torchaudio>=2.1.0
 transformers>=4.36.0
 pyworld>=0.3.4
 scipy>=1.14.0
+protobuf>=4.25.0

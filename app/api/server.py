@@ -60,6 +60,34 @@ def _save_profile(speaker_id: str, profile_data: dict, wav_bytes: bytes = None) 
     logger.info("Voice profile '%s' saved to %s", speaker_id, profile_dir)
 
 
+async def _sync_profiles_to_docker() -> None:
+    """Register all custom profiles in the Docker voice-conversion service."""
+    if not _custom_profiles:
+        return
+    ctrl = _controller
+    if ctrl is None:
+        return
+    import httpx
+    base = ctrl.config.services.voice_conversion_url.rstrip("/")
+    async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0)) as client:
+        for sid, data in _custom_profiles.items():
+            payload = {
+                "speaker_id": sid,
+                "f0_mean": data.get("f0_mean", 0),
+                "f0_std": data.get("f0_std", 25.0),
+                "spectral_tilt": data.get("spectral_tilt", 1.0),
+                "formant_shift": data.get("formant_shift", 1.0),
+                "gain": data.get("gain", 1.0),
+                "breathiness": data.get("breathiness", 0.0),
+            }
+            try:
+                r = await client.post(f"{base}/speakers/add", json=payload)
+                r.raise_for_status()
+                logger.info("Synced profile '%s' to Docker service", sid)
+            except Exception:
+                logger.warning("Failed to sync profile '%s' to Docker", sid)
+
+
 def get_controller() -> AvatarController:
     if _controller is None:
         raise HTTPException(status_code=503, detail="Controller not initialized")
@@ -81,6 +109,8 @@ async def lifespan(app: FastAPI):
     _custom_profiles.update(_load_saved_profiles())
     if _custom_profiles:
         logger.info("Loaded %d saved voice profile(s)", len(_custom_profiles))
+        # Re-register custom profiles in the Docker VC service
+        await _sync_profiles_to_docker()
 
     logger.info("Avatar system initialized")
     yield
@@ -291,6 +321,81 @@ async def upload_voice_sample(file: UploadFile = File(...), speaker_id: str = ""
         _save_profile(speaker_id, profile_data, wav_bytes=contents)
 
     return result
+
+
+# ─── Voice Test ───────────────────────────────────────────────────
+
+@app.post("/api/voice/test")
+async def test_voice_conversion(file: UploadFile = File(...), speaker_id: str = ""):
+    """
+    Accept a short audio recording, run voice conversion with the
+    specified speaker profile, and return the converted audio as WAV.
+    """
+    import base64
+    import struct
+    import wave
+
+    ctrl = get_controller()
+    contents = await file.read()
+
+    if len(contents) < 500:
+        raise HTTPException(status_code=400, detail="Recording too short")
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Recording too large (max 10 MB)")
+
+    # Decode the uploaded WAV
+    try:
+        wav_io = io.BytesIO(contents)
+        with wave.open(wav_io, "rb") as wf:
+            sample_rate = wf.getframerate()
+            n_frames = wf.getnframes()
+            raw_pcm = wf.readframes(n_frames)
+            sample_width = wf.getsampwidth()
+            n_channels = wf.getnchannels()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid audio: {e}")
+
+    # Convert to int16 mono
+    audio = np.frombuffer(raw_pcm, dtype=np.int16 if sample_width == 2 else np.uint8)
+    if sample_width == 1:
+        audio = ((audio.astype(np.int16) - 128) * 256)
+    if n_channels == 2:
+        audio = audio.reshape(-1, 2).mean(axis=1).astype(np.int16)
+
+    # Resample to 16kHz if needed
+    if sample_rate != 16000:
+        import scipy.signal
+        num_samples = int(len(audio) * 16000 / sample_rate)
+        audio = scipy.signal.resample(audio.astype(np.float32), num_samples).astype(np.int16)
+        sample_rate = 16000
+
+    # Normalize to float32 [-1.0, 1.0] for the conversion API
+    audio_f32 = audio.astype(np.float32) / 32768.0
+
+    # Run voice conversion with the specified speaker
+    converted = await ctrl._voice_conv.convert(
+        audio_f32, sample_rate, speaker_id=speaker_id or None
+    )
+    if converted is None:
+        raise HTTPException(status_code=502, detail="Voice conversion service unavailable")
+
+    # Convert back to int16
+    converted_i16 = (converted * 32768).clip(-32768, 32767).astype(np.int16)
+
+    # Build WAV response
+    out_io = io.BytesIO()
+    with wave.open(out_io, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(converted_i16.tobytes())
+    out_io.seek(0)
+
+    return StreamingResponse(
+        out_io,
+        media_type="audio/wav",
+        headers={"Content-Disposition": "inline; filename=converted.wav"},
+    )
 
 
 # ─── Video Streaming ──────────────────────────────────────────────
