@@ -47,5 +47,8 @@ app/tracking/models/*.task
 *.wav
 *.mp3
 
+# Saved voice profiles (contain user WAV samples)
+voice_profiles/
+
 # Misc
 images.jpg

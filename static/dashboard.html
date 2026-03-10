@@ -109,6 +109,29 @@ input[type="file"] { display:none; }
 .toast.info { border-left:3px solid #3b82f6; }
 @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
 
+/* Mode toggle */
+.mode-tabs { display:flex; gap:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-right:12px; }
+.mode-tab { padding:8px 16px; font:500 0.78rem/1 'Inter',sans-serif; background:transparent; color:var(--muted); border:none; cursor:pointer; transition:all 0.15s; border-right:1px solid var(--border); }
+.mode-tab:last-child { border-right:none; }
+.mode-tab:hover { color:var(--text); background:var(--surface2); }
+.mode-tab.active { background:var(--accent); color:#fff; }
+.mode-tab svg { vertical-align:-2px; margin-right:5px; }
+
+/* Audio-only state */
+.audio-only-banner { display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:40px 20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); flex:1; min-height:200px; text-align:center; }
+.audio-only-banner.visible { display:flex; }
+.audio-only-banner svg { opacity:0.5; }
+.audio-only-banner .aob-title { font-size:1rem; font-weight:600; }
+.audio-only-banner .aob-sub { font-size:0.8rem; color:var(--text2); line-height:1.5; max-width:380px; }
+.audio-wave { display:flex; align-items:center; gap:3px; height:32px; }
+.audio-wave span { width:4px; background:var(--accent); border-radius:2px; animation:wave 1s ease-in-out infinite; }
+.audio-wave span:nth-child(1){height:10px;animation-delay:0s}
+.audio-wave span:nth-child(2){height:20px;animation-delay:0.1s}
+.audio-wave span:nth-child(3){height:28px;animation-delay:0.2s}
+.audio-wave span:nth-child(4){height:20px;animation-delay:0.3s}
+.audio-wave span:nth-child(5){height:10px;animation-delay:0.4s}
+@keyframes wave { 0%,100%{transform:scaleY(0.5)} 50%{transform:scaleY(1)} }
+
 /* Responsive */
 @media(max-width:900px) {
     .layout { grid-template-columns:1fr; }
@@ -135,6 +158,14 @@ input[type="file"] { display:none; }
 
     <!-- Controls -->
     <div class="start-area">
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="modeFullBtn" onclick="setMode('full')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Video + Audio
+            </button>
+            <button class="mode-tab" id="modeAudioBtn" onclick="setMode('audio')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>Audio Only
+            </button>
+        </div>
         <button class="btn-start" id="btnStart" onclick="startPipeline()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>
             Start Avatar
@@ -145,8 +176,8 @@ input[type="file"] { display:none; }
         </button>
     </div>
 
-    <!-- Video -->
-    <div class="video-grid">
+    <!-- Video (full mode) -->
+    <div class="video-grid" id="videoGrid">
         <div class="video-box" id="webcamBox">
             <div class="video-tag"><span class="live-dot" id="camLive" style="display:none"></span>Your Camera</div>
             <img id="webcamFeed" src="" alt="" style="display:none" />
@@ -162,6 +193,20 @@ input[type="file"] { display:none; }
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
                 Avatar preview appears here
             </div>
+        </div>
+    </div>
+
+    <!-- Audio-only banner -->
+    <div class="audio-only-banner" id="audioOnlyBanner">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+        <div class="aob-title">Audio Only Mode</div>
+        <div class="aob-sub" id="aobSub">Voice conversion active. Select "CABLE Output (VB-Audio)" as your microphone in your call app.</div>
+        <div class="audio-wave" id="audioWave" style="display:none">
+            <span></span><span></span><span></span><span></span><span></span>
         </div>
     </div>
 
@@ -204,18 +249,13 @@ input[type="file"] { display:none; }
     <!-- Voice -->
     <div class="sb-section">
         <div class="sb-title">Voice</div>
-        <select class="sel" id="voiceSel">
+        <select class="sel" id="voiceSel" onchange="setVoice()">
             <option value="default">Default (No Change)</option>
-            <option value="male_1">Male Deep</option>
-            <option value="male_2">Male Medium</option>
-            <option value="female_1">Female Bright</option>
-            <option value="female_2">Female Warm</option>
         </select>
-        <button class="btn-sm" style="margin-top:6px" onclick="setVoice()">Apply</button>
         <div style="margin-top:10px">
-            <input class="inp" id="voiceName" placeholder="Custom profile name" style="margin-bottom:6px" />
-            <button class="btn-sm" onclick="document.getElementById('voiceFile').click()">Upload .wav Sample</button>
-            <input type="file" id="voiceFile" accept=".wav,audio/wav" onchange="uploadVoice(this)" />
+            <input class="inp" id="voiceName" placeholder="Profile name (required)" style="margin-bottom:6px" />
+            <button class="btn-sm" id="uploadVoiceBtn" onclick="triggerVoiceUpload()">Upload .wav Sample</button>
+            <input type="file" id="voiceFile" accept=".wav,audio/wav" onchange="uploadVoice(this)" style="display:none" />
             <div id="voiceStatus" style="font-size:0.7rem;color:var(--muted);margin-top:5px"></div>
         </div>
     </div>
@@ -247,6 +287,17 @@ input[type="file"] { display:none; }
 <script>
 let running = false;
 let poll = null;
+let currentMode = 'full';
+
+function setMode(m) {
+    if (running) return; // can't switch while running
+    currentMode = m;
+    document.getElementById('modeFullBtn').className = 'mode-tab' + (m==='full'?' active':'');
+    document.getElementById('modeAudioBtn').className = 'mode-tab' + (m==='audio'?' active':'');
+    document.getElementById('videoGrid').style.display = m==='full' ? 'grid' : 'none';
+    document.getElementById('audioOnlyBanner').style.display = m==='audio' ? 'flex' : 'none';
+    document.getElementById('audioWave').style.display = 'none';
+}
 
 
 /* ── Toast ─────────────────────────────────────── */
@@ -263,11 +314,11 @@ function toast(msg, type) {
 /* ── Pipeline ──────────────────────────────────── */
 async function startPipeline() {
     try {
-        const r = await fetch('/api/pipeline/start', { method:'POST' });
+        const r = await fetch('/api/pipeline/start?mode='+currentMode, { method:'POST' });
         const d = await r.json();
         if (!r.ok) { toast(d.detail||'Start failed','err'); return; }
         toast(d.message||'Pipeline started');
-        setRunning(true);
+        setRunning(true, d.mode || currentMode);
     } catch(e) { toast('Failed to start','err'); }
 }
 async function stopPipeline() {
@@ -278,15 +329,25 @@ async function stopPipeline() {
         setRunning(false);
     } catch(e) { toast('Failed to stop','err'); }
 }
-function setRunning(on) {
+function setRunning(on, mode) {
     running = on;
+    if (mode) currentMode = mode;
     const pill = document.getElementById('statusPill');
-    document.getElementById('statusText').textContent = on ? 'Live' : 'Offline';
+    const modeSuffix = currentMode === 'audio' ? ' (Audio)' : '';
+    document.getElementById('statusText').textContent = on ? 'Live' + modeSuffix : 'Offline';
     pill.className = on ? 'status on' : 'status';
     document.getElementById('btnStart').style.display = on ? 'none' : 'flex';
     document.getElementById('btnStop').style.display = on ? 'flex' : 'none';
 
-    if (on) {
+    // Disable mode toggle while running
+    document.getElementById('modeFullBtn').disabled = on;
+    document.getElementById('modeAudioBtn').disabled = on;
+    if (on) { document.querySelectorAll('.mode-tab').forEach(t=>t.style.opacity=on?'0.5':'1'); }
+    else { document.querySelectorAll('.mode-tab').forEach(t=>t.style.opacity='1'); }
+
+    if (on && currentMode === 'full') {
+        document.getElementById('videoGrid').style.display = 'grid';
+        document.getElementById('audioOnlyBanner').style.display = 'none';
         // Show webcam feed from server (OpenCV capture)
         const wcImg = document.getElementById('webcamFeed');
         wcImg.src = '/api/stream/webcam?' + Date.now();
@@ -301,6 +362,11 @@ function setRunning(on) {
         document.getElementById('avatarOff').style.display = 'none';
         document.getElementById('avatarLive').style.display = 'inline-block';
         startPoll();
+    } else if (on && currentMode === 'audio') {
+        document.getElementById('videoGrid').style.display = 'none';
+        document.getElementById('audioOnlyBanner').style.display = 'flex';
+        document.getElementById('audioWave').style.display = 'flex';
+        startPoll();
     } else {
         document.getElementById('webcamFeed').style.display = 'none';
         document.getElementById('webcamOff').style.display = 'flex';
@@ -309,6 +375,12 @@ function setRunning(on) {
         document.getElementById('avatarFeed').style.display = 'none';
         document.getElementById('avatarOff').style.display = 'flex';
         document.getElementById('avatarLive').style.display = 'none';
+
+        document.getElementById('audioWave').style.display = 'none';
+        if (currentMode === 'full') {
+            document.getElementById('videoGrid').style.display = 'grid';
+            document.getElementById('audioOnlyBanner').style.display = 'none';
+        }
         stopPoll();
         document.getElementById('sFps').textContent = '--';
         document.getElementById('sDrift').textContent = '--';
@@ -323,6 +395,7 @@ async function pollStatus() {
         const r = await fetch('/api/status');
         const d = await r.json();
         if (!d.running && running) { setRunning(false); return; }
+        if (d.running && !running) { setRunning(true, d.mode); return; }
         const s = d.stats;
         document.getElementById('sFps').textContent = s.processing_fps||'--';
         document.getElementById('sDrift').textContent = s.av_drift_ms||'--';
@@ -373,22 +446,35 @@ async function setVoice() {
         toast('Voice set to "'+id+'"');
     } catch(e) { toast('Failed','err'); }
 }
+function triggerVoiceUpload() {
+    const name = document.getElementById('voiceName').value.trim();
+    if (!name) {
+        toast('Enter a profile name first', 'err');
+        document.getElementById('voiceName').focus();
+        return;
+    }
+    document.getElementById('voiceFile').click();
+}
 async function uploadVoice(inp) {
     if (!inp.files.length) return;
-    let sid = document.getElementById('voiceName').value.trim().replace(/[^a-zA-Z0-9_-]/g,'_');
-    if (!sid) sid = 'custom_'+Date.now();
+    let sid = document.getElementById('voiceName').value.trim().replace(/[^a-zA-Z0-9_\- ]/g,'_');
+    if (!sid) { toast('Enter a profile name first','err'); inp.value=''; return; }
     const st = document.getElementById('voiceStatus');
-    st.textContent = 'Analyzing voice…'; st.style.color='var(--muted)';
+    st.textContent = 'Analyzing voice...'; st.style.color='var(--muted)';
+    document.getElementById('uploadVoiceBtn').disabled = true;
     const fd = new FormData(); fd.append('file', inp.files[0]);
     try {
         const r = await fetch('/api/voice/upload?speaker_id='+encodeURIComponent(sid), { method:'POST', body:fd });
         const d = await r.json();
         if (!r.ok) { st.textContent=d.detail||'Failed'; st.style.color='var(--red)'; toast(d.detail||'Failed','err'); return; }
-        st.textContent='Created "'+sid+'"'; st.style.color='var(--green)';
-        toast('Voice profile created');
+        st.textContent='Saved "'+sid+'"'; st.style.color='var(--green)';
+        toast('Voice profile "'+sid+'" created and applied');
+        document.getElementById('voiceName').value = '';
         await refreshVoices();
         document.getElementById('voiceSel').value = sid;
+        await setVoice();
     } catch(e) { st.textContent='Failed'; st.style.color='var(--red)'; toast('Upload failed','err'); }
+    finally { document.getElementById('uploadVoiceBtn').disabled = false; }
     inp.value = '';
 }
 async function refreshVoices() {
@@ -397,16 +483,42 @@ async function refreshVoices() {
         const d = await r.json();
         const sel = document.getElementById('voiceSel');
         const cur = sel.value;
-        const labels = { default:'Default (No Change)', male_1:'Male Deep', male_2:'Male Medium', female_1:'Female Bright', female_2:'Female Warm' };
+        const builtIn = {
+            default: 'Default (No Change)',
+            male_1: 'Male Deep',
+            male_2: 'Male Medium',
+            female_1: 'Female Bright',
+            female_2: 'Female Warm'
+        };
         sel.innerHTML = '';
-        for (const [id,info] of Object.entries(d.speakers)) {
+        // Built-in voices first
+        for (const [id, label] of Object.entries(builtIn)) {
+            if (d.speakers[id] !== undefined) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = label;
+                sel.appendChild(opt);
+            }
+        }
+        // Custom / saved profiles
+        let hasCustom = false;
+        for (const [id, info] of Object.entries(d.speakers)) {
+            if (builtIn[id]) continue;
+            if (!hasCustom) {
+                const sep = document.createElement('option');
+                sep.disabled = true;
+                sep.textContent = '--- Custom Profiles ---';
+                sel.appendChild(sep);
+                hasCustom = true;
+            }
             const opt = document.createElement('option');
             opt.value = id;
-            opt.textContent = labels[id] || (info.name||id)+' ('+Math.round(info.f0_mean||0)+' Hz)';
+            const hz = info.f0_mean ? ' ('+Math.round(info.f0_mean)+' Hz)' : '';
+            opt.textContent = (info.name || id) + hz;
             sel.appendChild(opt);
         }
-        if ([...sel.options].some(o=>o.value===cur)) sel.value = cur;
-    } catch(e){}
+        if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+    } catch(e) { console.error('refreshVoices failed', e); }
 }
 
 /* ── Devices ───────────────────────────────────── */
@@ -425,7 +537,7 @@ window.addEventListener('load', () => {
     checkServices();
     refreshVoices();
     loadDevices();
-    fetch('/api/status').then(r=>r.json()).then(d => { if(d.running) setRunning(true); }).catch(()=>{});
+    fetch('/api/status').then(r=>r.json()).then(d => { if(d.running) setRunning(true, d.mode); }).catch(()=>{});
 });
 </script>
 </body>

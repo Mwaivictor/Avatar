@@ -2,11 +2,13 @@
 
 import asyncio
 import io
+import json
 import logging
 import os
 import sys
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 import cv2
@@ -24,6 +26,38 @@ logger = logging.getLogger(__name__)
 
 _controller: Optional[AvatarController] = None
 _config: Optional[AppConfig] = None
+_custom_profiles: dict = {}
+
+VOICE_PROFILES_DIR = Path("voice_profiles")
+
+
+def _load_saved_profiles() -> dict:
+    """Load all saved voice profiles from disk."""
+    profiles = {}
+    if not VOICE_PROFILES_DIR.exists():
+        return profiles
+    for meta_file in VOICE_PROFILES_DIR.glob("*/profile.json"):
+        try:
+            data = json.loads(meta_file.read_text(encoding="utf-8"))
+            sid = data.get("speaker_id", meta_file.parent.name)
+            profiles[sid] = data
+        except Exception:
+            logger.warning("Failed to load profile: %s", meta_file)
+    return profiles
+
+
+def _save_profile(speaker_id: str, profile_data: dict, wav_bytes: bytes = None) -> None:
+    """Save a voice profile (metadata + optional WAV) to disk."""
+    safe_id = "".join(c if c.isalnum() or c in "_-" else "_" for c in speaker_id)
+    profile_dir = VOICE_PROFILES_DIR / safe_id
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    meta = {"speaker_id": speaker_id, **profile_data}
+    (profile_dir / "profile.json").write_text(
+        json.dumps(meta, indent=2), encoding="utf-8"
+    )
+    if wav_bytes:
+        (profile_dir / "sample.wav").write_bytes(wav_bytes)
+    logger.info("Voice profile '%s' saved to %s", speaker_id, profile_dir)
 
 
 def get_controller() -> AvatarController:
@@ -35,7 +69,7 @@ def get_controller() -> AvatarController:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle."""
-    global _controller, _config
+    global _controller, _config, _custom_profiles
     _config = AppConfig()
     _controller = AvatarController(_config)
 
@@ -43,12 +77,17 @@ async def lifespan(app: FastAPI):
     if os.path.exists(_config.avatar_image_path):
         _controller.load_avatar(_config.avatar_image_path)
 
+    # Restore saved voice profiles from disk
+    _custom_profiles.update(_load_saved_profiles())
+    if _custom_profiles:
+        logger.info("Loaded %d saved voice profile(s)", len(_custom_profiles))
+
     logger.info("Avatar system initialized")
     yield
 
     # Shutdown
     if _controller and _controller.is_running:
-        _controller.stop()
+        await _controller.stop()
     logger.info("Avatar system shut down")
 
 
@@ -76,6 +115,7 @@ async def get_status():
     ctrl = get_controller()
     return {
         "running": ctrl.is_running,
+        "mode": ctrl.mode,
         "stats": ctrl.stats.to_dict(),
     }
 
@@ -93,18 +133,24 @@ async def check_services():
 async def start_pipeline(
     enable_virtual_cam: bool = True,
     enable_virtual_mic: bool = True,
+    mode: str = "full",
 ):
     ctrl = get_controller()
     if ctrl.is_running:
         return {"message": "Pipeline already running"}
 
+    if mode not in ("full", "audio"):
+        raise HTTPException(status_code=400, detail="Mode must be 'full' or 'audio'")
+
     ctrl.start(
-        enable_virtual_cam=enable_virtual_cam,
+        enable_virtual_cam=enable_virtual_cam and mode == "full",
         enable_virtual_mic=enable_virtual_mic,
+        mode=mode,
     )
     return {
-        "message": "Pipeline started",
-        "virtual_camera": enable_virtual_cam,
+        "message": f"Pipeline started ({mode} mode)",
+        "mode": mode,
+        "virtual_camera": enable_virtual_cam and mode == "full",
         "virtual_microphone": enable_virtual_mic,
     }
 
@@ -114,7 +160,7 @@ async def stop_pipeline():
     ctrl = get_controller()
     if not ctrl.is_running:
         return {"message": "Pipeline not running"}
-    ctrl.stop()
+    await ctrl.stop()
     return {"message": "Pipeline stopped"}
 
 
@@ -151,22 +197,28 @@ async def set_speaker(speaker_id: str):
 async def list_speakers():
     """List all available voice profiles (built-in + custom)."""
     ctrl = get_controller()
+    fallback = {
+        "default": {"name": "default", "f0_mean": 0, "formant_shift": 1.0},
+        "male_1": {"name": "male_deep", "f0_mean": 95.0, "formant_shift": 0.88},
+        "male_2": {"name": "male_mid", "f0_mean": 120.0, "formant_shift": 0.94},
+        "female_1": {"name": "female_bright", "f0_mean": 220.0, "formant_shift": 1.18},
+        "female_2": {"name": "female_warm", "f0_mean": 195.0, "formant_shift": 1.12},
+    }
     try:
         speakers = await ctrl.list_speakers()
-        return {"speakers": speakers}
+        if not speakers:
+            speakers = dict(fallback)
     except Exception:
-        # Fallback: return the built-in names
-        return {"speakers": {
-            "default": {"name": "default", "f0_mean": 0, "formant_shift": 1.0},
-            "male_1": {"name": "male_deep", "f0_mean": 95.0, "formant_shift": 0.88},
-            "male_2": {"name": "male_mid", "f0_mean": 120.0, "formant_shift": 0.94},
-            "female_1": {"name": "female_bright", "f0_mean": 220.0, "formant_shift": 1.18},
-            "female_2": {"name": "female_warm", "f0_mean": 195.0, "formant_shift": 1.12},
-        }}
+        speakers = dict(fallback)
+    # Merge in-memory custom profiles
+    speakers.update(_custom_profiles)
+    # Merge saved profiles from disk
+    speakers.update(_load_saved_profiles())
+    return {"speakers": speakers}
 
 
 @app.post("/api/voice/upload")
-async def upload_voice_sample(file: UploadFile = File(...), speaker_id: str = "custom"):
+async def upload_voice_sample(file: UploadFile = File(...), speaker_id: str = ""):
     """
     Upload a voice sample (.wav) to create a custom speaker profile.
 
@@ -175,6 +227,11 @@ async def upload_voice_sample(file: UploadFile = File(...), speaker_id: str = "c
     Requires at least 1 second of clear speech.
     """
     import base64
+
+    # Require a profile name
+    speaker_id = speaker_id.strip()
+    if not speaker_id or speaker_id == "custom":
+        raise HTTPException(status_code=400, detail="Profile name is required")
 
     ctrl = get_controller()
 
@@ -224,6 +281,14 @@ async def upload_voice_sample(file: UploadFile = File(...), speaker_id: str = "c
 
     # Auto-select the new profile
     ctrl.set_speaker(speaker_id)
+    logger.info("Voice profile '%s' created and auto-selected", speaker_id)
+
+    # Track custom profile locally so it survives Docker timeouts
+    if "profile" in result:
+        profile_data = {"name": speaker_id, **result["profile"]}
+        _custom_profiles[speaker_id] = profile_data
+        # Persist to disk for reuse across restarts
+        _save_profile(speaker_id, profile_data, wav_bytes=contents)
 
     return result
 

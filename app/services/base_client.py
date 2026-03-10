@@ -23,7 +23,7 @@ class BaseServiceClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
-                timeout=httpx.Timeout(self.timeout, connect=2.0),
+                timeout=httpx.Timeout(self.timeout, connect=5.0),
             )
         return self._client
 

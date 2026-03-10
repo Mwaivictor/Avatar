@@ -107,6 +107,7 @@ class AvatarController:
 
         # Control
         self._running = False
+        self._mode: str = "full"  # "full" or "audio"
         self._video_thread: Optional[threading.Thread] = None
         self._audio_thread: Optional[threading.Thread] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -157,26 +158,37 @@ class AvatarController:
         }
         return self.stats.services_healthy
 
-    def start(self, enable_virtual_cam: bool = True, enable_virtual_mic: bool = True) -> None:
-        """Start the full transformation pipeline."""
-        logger.info("Starting avatar transformation pipeline...")
+    def start(
+        self,
+        enable_virtual_cam: bool = True,
+        enable_virtual_mic: bool = True,
+        mode: str = "full",
+    ) -> None:
+        """Start the transformation pipeline.
 
-        # Start capture
-        self._video_capture.start()
+        Args:
+            mode: "full" for video + audio, "audio" for voice-only.
+        """
+        self._mode = mode
+        logger.info("Starting pipeline in %s mode...", mode)
+
+        # Audio capture is always needed
         self._audio_capture.start()
 
-        # Start virtual outputs
-        if enable_virtual_cam:
-            try:
-                self._virtual_cam = VirtualCameraOutput(
-                    width=self.config.rendering.output_width,
-                    height=self.config.rendering.output_height,
-                    fps=self.config.rendering.output_fps,
-                )
-                self._virtual_cam.start()
-            except Exception:
-                logger.warning("Virtual camera unavailable, skipping")
-                self._virtual_cam = None
+        # Video capture and virtual camera only in full mode
+        if mode == "full":
+            self._video_capture.start()
+            if enable_virtual_cam:
+                try:
+                    self._virtual_cam = VirtualCameraOutput(
+                        width=self.config.rendering.output_width,
+                        height=self.config.rendering.output_height,
+                        fps=self.config.rendering.output_fps,
+                    )
+                    self._virtual_cam.start()
+                except Exception:
+                    logger.warning("Virtual camera unavailable, skipping")
+                    self._virtual_cam = None
 
         if enable_virtual_mic:
             try:
@@ -195,16 +207,18 @@ class AvatarController:
         self._running = True
         self._loop = asyncio.new_event_loop()
 
-        self._video_thread = threading.Thread(
-            target=self._video_processing_loop, daemon=True
-        )
+        if mode == "full":
+            self._video_thread = threading.Thread(
+                target=self._video_processing_loop, daemon=True
+            )
+            self._video_thread.start()
+
         self._audio_thread = threading.Thread(
             target=self._audio_processing_loop, daemon=True
         )
-        self._video_thread.start()
         self._audio_thread.start()
 
-        logger.info("Pipeline started successfully")
+        logger.info("Pipeline started successfully (%s mode)", mode)
 
     def _video_processing_loop(self) -> None:
         """Main video processing loop running in its own thread."""
@@ -334,7 +348,7 @@ class AvatarController:
                 )
         return frame
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         """Stop all pipeline components and release resources."""
         logger.info("Stopping avatar transformation pipeline...")
         self._running = False
@@ -344,19 +358,22 @@ class AvatarController:
         if self._audio_thread is not None:
             self._audio_thread.join(timeout=3.0)
 
-        self._video_capture.stop()
         self._audio_capture.stop()
-        self._face_tracker.close()
+        if self._mode == "full":
+            self._video_capture.stop()
+            self._face_tracker.close()
 
         if self._virtual_cam is not None:
             self._virtual_cam.stop()
         if self._virtual_mic is not None:
             self._virtual_mic.stop()
 
-        if self._loop is not None:
-            self._loop.run_until_complete(self._face_anim.close())
-            self._loop.run_until_complete(self._voice_conv.close())
-            self._loop.run_until_complete(self._lip_sync.close())
+        # Close async HTTP clients from the current (FastAPI) event loop
+        await self._face_anim.close()
+        await self._voice_conv.close()
+        await self._lip_sync.close()
+
+        if self._loop is not None and not self._loop.is_closed():
             self._loop.close()
 
         logger.info(
@@ -368,3 +385,7 @@ class AvatarController:
     @property
     def is_running(self) -> bool:
         return self._running
+
+    @property
+    def mode(self) -> str:
+        return self._mode

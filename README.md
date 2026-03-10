@@ -19,10 +19,11 @@ Transform your appearance and voice in real time for video calls. Avatar replace
 - **Real-time face animation** — Your expressions drive an avatar face using First Order Motion Model (FOMM)
 - **Voice conversion** — Transform your voice in real time using HuBERT + WORLD vocoder
 - **Lip sync** — Keep avatar mouth movements matched to your speech with Wav2Lip
+- **Audio-only mode** — Voice-only transformation for phone/voice calls without the camera pipeline
 - **Virtual camera & microphone** — Output appears as standard system devices (OBS Virtual Camera + VB-Audio)
 - **Works with any app** — Google Meet, Zoom, Teams, Discord, WhatsApp — anything that uses a camera/mic
 - **Web dashboard** — Simple browser UI to control everything, preview feeds, and upload avatars
-- **Custom voice profiles** — Upload a `.wav` sample to clone a voice
+- **Persistent voice profiles** — Upload a `.wav` sample to clone a voice; profiles are saved to disk and reloaded across restarts
 
 ---
 
@@ -77,8 +78,8 @@ Or install manually:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/avatar.git
-cd avatar
+git clone https://github.com/Mwaivictor/Avatar.git
+cd Avatar
 
 # 2. Install Python dependencies
 pip install -r requirements.txt
@@ -97,11 +98,12 @@ python start.py
 
 ### Using with Video Calls
 
-1. Click **Start Avatar** in the dashboard
-2. In your video call app (Meet, Zoom, Teams), go to **Settings**:
-   - **Camera** → select **OBS Virtual Camera**
+1. Select mode: **Video + Audio** for video calls, or **Audio Only** for voice calls
+2. Click **Start Avatar** in the dashboard
+3. In your video call app (Meet, Zoom, Teams), go to **Settings**:
+   - **Camera** → select **OBS Virtual Camera** (full mode only)
    - **Microphone** → select **CABLE Output (VB-Audio Virtual Cable)**
-3. Others will see your avatar and hear your converted voice
+4. Others will see your avatar and hear your converted voice
 
 ---
 
@@ -109,10 +111,13 @@ python start.py
 
 The web dashboard at `http://127.0.0.1:8000` provides:
 
-- **Live preview** — See your webcam input and avatar output side by side
+- **Mode selection** — Choose between **Video + Audio** (full avatar) or **Audio Only** (voice calls)
+- **Live preview** — See your webcam input and avatar output side by side (full mode)
+- **Audio visualizer** — Animated waveform display when running in audio-only mode
 - **One-click start/stop** — No complex setup, just click Start
 - **Avatar upload** — Upload any face image as your avatar
 - **Voice selection** — Choose from built-in voice profiles or upload custom `.wav` samples
+- **Persistent voice profiles** — Uploaded voice profiles are saved to disk and available across restarts
 - **Service health** — Monitor the 3 AI inference containers
 - **Performance stats** — FPS, A/V drift, frame/audio counters
 
@@ -130,7 +135,7 @@ avatar/
 ├── install_virtual_devices.ps1 # Windows driver installer
 │
 ├── app/
-│   ├── controller.py           # Pipeline orchestrator
+│   ├── controller.py           # Pipeline orchestrator (full + audio-only modes)
 │   ├── api/
 │   │   └── server.py           # FastAPI REST API + web UI
 │   ├── capture/
@@ -158,6 +163,7 @@ avatar/
 │
 ├── static/
 │   └── dashboard.html          # Web UI
+├── voice_profiles/             # Saved custom voice profiles (auto-created)
 ├── checkpoints/                # Model weights (not in repo — see below)
 └── tests/
 ```
@@ -196,7 +202,7 @@ cp .env.example .env
 | `GET` | `/health` | Server health check |
 | `GET` | `/api/status` | Pipeline status + stats |
 | `GET` | `/api/services/health` | AI service health |
-| `POST` | `/api/pipeline/start` | Start the pipeline |
+| `POST` | `/api/pipeline/start` | Start the pipeline (`?mode=full` or `?mode=audio`) |
 | `POST` | `/api/pipeline/stop` | Stop the pipeline |
 | `POST` | `/api/avatar/upload` | Upload avatar image |
 | `GET` | `/api/voice/speakers` | List voice profiles |
@@ -261,7 +267,8 @@ Planned features and research directions for upcoming releases:
 ### Near-Term
 - [ ] **Multi-avatar switching** — Hot-swap between different avatar faces mid-call
 - [ ] **Emotion intensity slider** — Control how much expression transfers (subtle to exaggerated)
-- [ ] **Audio-only mode** — Voice conversion without the camera pipeline for lower resource usage
+- [x] **Audio-only mode** — Voice conversion without the camera pipeline for lower resource usage
+- [x] **Persistent voice profiles** — Upload voice samples that are saved to disk and reloaded across restarts
 - [ ] **Session recording** — Record avatar output locally for review or demo purposes
 - [ ] **Linux and macOS support** — PulseAudio/PipeWire virtual mic, v4l2loopback virtual camera
 
