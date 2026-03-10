@@ -85,11 +85,11 @@ class ContentEncoder:
         if self.model is not None:
             return
 
-        from transformers import HubertModel, Wav2Vec2Processor
+        from transformers import HubertModel, Wav2Vec2FeatureExtractor
         import torch
 
         logger.info("Loading HuBERT model: %s", self._model_name)
-        self.processor = Wav2Vec2Processor.from_pretrained(self._model_name)
+        self.processor = Wav2Vec2FeatureExtractor.from_pretrained(self._model_name)
         self.model = HubertModel.from_pretrained(self._model_name).to(self.device)
         self.model.eval()
         logger.info("HuBERT loaded on %s", self.device)
