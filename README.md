@@ -6,15 +6,15 @@
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
 </p>
 
-# 🎭 Avatar — Real-Time Avatar & Voice Transformation
+# Avatar — Real-Time Avatar & Voice Transformation
 
 Transform your appearance and voice in real time for video calls. Avatar replaces your webcam feed with an AI-generated avatar that mirrors your facial expressions and converts your voice — all routed through virtual devices that work with **any** video call app (Google Meet, Zoom, Teams, Discord, etc.).
 
-> **⚠️ Educational & Research Project** — This system is built for learning about real-time AI pipelines, computer vision, and audio processing. Use responsibly and ethically.
+> **[!] Educational & Research Project** — This system is built for learning about real-time AI pipelines, computer vision, and audio processing. Use responsibly and ethically.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Real-time face animation** — Your expressions drive an avatar face using First Order Motion Model (FOMM)
 - **Voice conversion** — Transform your voice in real time using HuBERT + WORLD vocoder
@@ -26,7 +26,7 @@ Transform your appearance and voice in real time for video calls. Avatar replace
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌──────────────┐     ┌──────────────────────────────────────────┐     ┌───────────────┐
@@ -47,7 +47,7 @@ Transform your appearance and voice in real time for video calls. Avatar replace
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
 | Requirement | Details |
 |---|---|
@@ -73,7 +73,7 @@ Or install manually:
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # 1. Clone the repository
@@ -105,7 +105,7 @@ python start.py
 
 ---
 
-## 🖥️ Dashboard
+## Dashboard
 
 The web dashboard at `http://127.0.0.1:8000` provides:
 
@@ -118,7 +118,7 @@ The web dashboard at `http://127.0.0.1:8000` provides:
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 avatar/
@@ -164,7 +164,7 @@ avatar/
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 All settings are configurable via environment variables. Copy `.env.example` to `.env`:
 
@@ -188,7 +188,7 @@ cp .env.example .env
 
 ---
 
-## 🔌 REST API
+## REST API
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -208,7 +208,7 @@ cp .env.example .env
 
 ---
 
-## 🧠 AI Models
+## AI Models
 
 | Service | Model | Port | Purpose |
 |---|---|---|---|
@@ -226,7 +226,7 @@ If running without Docker, place checkpoints in `checkpoints/`:
 
 ---
 
-## 🛠️ Development
+## Development
 
 ### Running without Docker
 
@@ -254,7 +254,7 @@ python -m pytest tests/ -v
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
 
@@ -266,13 +266,13 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## ⚠️ Ethical Use
+## Ethical Use
 
 This software is intended for **educational and research purposes**. Users are responsible for ensuring their use complies with:
 
@@ -285,7 +285,7 @@ This software is intended for **educational and research purposes**. Users are r
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [First Order Motion Model](https://github.com/AliaksandrSiarohin/first-order-model) — Aliaksandr Siarohin et al.
 - [Wav2Lip](https://github.com/Rudrabha/Wav2Lip) — Rudrabha Mukhopadhyay et al.

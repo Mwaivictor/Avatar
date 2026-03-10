@@ -123,4 +123,4 @@ Open an issue on GitHub with the `question` label, or start a discussion in the 
 
 ---
 
-Thank you for helping make Avatar better! 🎭
+Thank you for helping make Avatar better!
