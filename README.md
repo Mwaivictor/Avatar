@@ -254,6 +254,69 @@ python -m pytest tests/ -v
 
 ---
 
+## Roadmap
+
+Planned features and research directions for upcoming releases:
+
+### Near-Term
+- [ ] **Multi-avatar switching** — Hot-swap between different avatar faces mid-call
+- [ ] **Emotion intensity slider** — Control how much expression transfers (subtle to exaggerated)
+- [ ] **Audio-only mode** — Voice conversion without the camera pipeline for lower resource usage
+- [ ] **Session recording** — Record avatar output locally for review or demo purposes
+- [ ] **Linux and macOS support** — PulseAudio/PipeWire virtual mic, v4l2loopback virtual camera
+
+### Mid-Term
+- [ ] **3D avatar support** — Drive a 3D mesh head (e.g. Ready Player Me, MetaHuman) instead of 2D image
+- [ ] **Background replacement** — Virtual backgrounds composited behind the avatar
+- [ ] **Multi-language voice cloning** — Cross-lingual voice conversion preserving accent and prosody
+- [ ] **Real-time style transfer** — Apply artistic styles (cartoon, anime, sketch) to the avatar
+- [ ] **Mobile companion app** — Control the avatar system from your phone during a call
+
+### Long-Term Research
+- [ ] **Zero-shot avatar generation** — Generate a completely new face from a text description
+- [ ] **Gesture synthesis** — Generate upper-body movement and hand gestures from speech
+- [ ] **Emotion-aware voice modulation** — Automatically adjust voice tone based on detected facial emotion
+- [ ] **Edge deployment** — Optimized models for running inference directly on-device without Docker
+- [ ] **Live translation overlay** — Real-time speech translation with lip-synced output in another language
+
+---
+
+## Areas of Collaboration
+
+We're actively looking for contributors and collaborators in these areas:
+
+### Research Collaboration
+| Area | What We Need | Relevant Skills |
+|---|---|---|
+| **Generative models** | Better face animation with fewer artifacts | GANs, diffusion models, PyTorch |
+| **Voice synthesis** | Lower-latency real-time voice conversion | Speech processing, DSP, vocoder design |
+| **Lip sync accuracy** | Improved mouth shape prediction from audio | Audio-visual ML, phoneme mapping |
+| **Model compression** | Smaller models for CPU/edge inference | Quantization, pruning, knowledge distillation |
+| **Evaluation metrics** | Perceptual quality benchmarks for avatar output | Image quality assessment, user studies |
+
+### Engineering Collaboration
+| Area | What We Need | Relevant Skills |
+|---|---|---|
+| **Cross-platform** | Linux virtual devices, macOS CoreAudio integration | Systems programming, OS-level APIs |
+| **WebRTC integration** | Direct browser-to-browser avatar streaming | WebRTC, media servers |
+| **GPU optimization** | CUDA kernels, TensorRT model export | CUDA, ONNX, TensorRT |
+| **CI/CD pipeline** | Automated testing, Docker image publishing | GitHub Actions, container registries |
+| **Security audit** | Review virtual device isolation and data flow | Application security, threat modeling |
+
+### Community Collaboration
+- **Documentation** — Tutorials, video guides, translation to other languages
+- **UI/UX design** — Dashboard improvements, accessibility, mobile-responsive layouts
+- **Testing** — Cross-platform testing, edge case discovery, performance benchmarking
+- **Use case exploration** — Accessibility tools, privacy-preserving video calls, creative applications
+
+### How to Get Involved
+1. Check the [Issues](https://github.com/Mwaivictor/Avatar/issues) tab for open tasks
+2. Join a discussion in [Discussions](https://github.com/Mwaivictor/Avatar/discussions)
+3. Propose a new feature by opening an issue with the `enhancement` label
+4. Reach out for research collaboration by opening an issue with the `research` label
+
+---
+
 ## Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
